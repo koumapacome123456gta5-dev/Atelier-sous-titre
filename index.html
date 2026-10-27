@@ -192,7 +192,7 @@ select{font:500 14px var(--f-body);padding:7px 8px;border-radius:8px;border:1px 
 
       <div class="sect">
         <h2>Télécharger la vidéo</h2>
-        <p class="hint">Un seul bouton : la vidéo est fabriquée en haute qualité (jusqu'à 1080p, son d'origine) avec le style choisi, puis téléchargée directement. La fabrication prend la durée de la vidéo : garde l'écran allumé et reste sur la page.</p>
+        <p class="hint">Un seul bouton : la vidéo est fabriquée en haute qualité (720p sur téléphone, 1080p sur ordinateur, son d'origine) avec le style choisi, puis téléchargée directement. La fabrication prend la durée de la vidéo : garde l'écran allumé et reste sur la page.</p>
         <div class="row">
           <button id="rec" class="primary big">Télécharger la vidéo sous-titrée</button>
           <button id="rec-stop" hidden>Annuler</button>
@@ -433,7 +433,7 @@ function drawPreview(){
 }
 function loop(){
   // On ne redessine que si quelque chose bouge (économise la batterie)
-  const demo=!hasMedia()&&isSample,playing=hasMedia()&&!video.paused;
+  const demo=!hasMedia()&&isSample,playing=hasMedia()&&!video.paused&&!recording;
   if(demo){demoT=((performance.now()-demoStart)/1000)%11;$('cur').textContent=fmt(demoT);}
   if(playing)$('cur').textContent=fmt(video.currentTime);
   if(demo||playing){moveHead();drawPreview();}
@@ -563,41 +563,59 @@ $('rec').onclick=()=>{
   if(!hasMedia())return recMsg("Ouvre d'abord une vidéo ou un son.",true);
   if(!cues.length)return recMsg("Il n'y a pas encore de sous-titres : lance d'abord la transcription.",true);
   if(!window.MediaRecorder)return recMsg("Ce navigateur ne sait pas fabriquer de vidéo. Essaie Chrome, Edge ou Safari à jour.",true);
-  if(recording)return;
+  if(recording||transcribing)return;
   const mime=['video/mp4;codecs=avc1.640028,mp4a.40.2','video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm'].find(m=>MediaRecorder.isTypeSupported(m));
   if(!mime)return recMsg("Aucun format vidéo disponible dans ce navigateur.",true);
+  // Téléphone : 720p (fluide) ; ordinateur : 1080p
+  const maxSide=isMobile?1280:1920;
   let W,H;
-  if(isAudio){const [a,b]=st.ratio.split(':').map(Number);if(a>=b){W=1920;H=Math.round(1920*b/a);}else{H=1920;W=Math.round(1920*a/b);}}
-  else{W=video.videoWidth;H=video.videoHeight;const sc=Math.min(1,1920/Math.max(W,H));W=Math.round(W*sc/2)*2;H=Math.round(H*sc/2)*2;}
+  if(isAudio){const [a,b]=st.ratio.split(':').map(Number);if(a>=b){W=maxSide;H=Math.round(maxSide*b/a);}else{H=maxSide;W=Math.round(maxSide*a/b);}}
+  else{W=video.videoWidth;H=video.videoHeight;const sc=Math.min(1,maxSide/Math.max(W,H));W=Math.round(W*sc);H=Math.round(H*sc);}
+  W-=W%2;H-=H%2;
   const cv=document.createElement('canvas');cv.width=W;cv.height=H;const cx=cv.getContext('2d',{alpha:false});
   // Tout ce qui suit jusqu'à play() reste dans le geste de l'utilisateur (exigé par l'iPhone)
   try{ensureGraph();actx.resume();}catch(e){return recMsg("Impossible de capter le son de ce fichier.",true);}
   const dest=actx.createMediaStreamDestination();srcNode.connect(dest);
-  const drawFrame=()=>{if(isAudio){cx.fillStyle=st.bg;cx.fillRect(0,0,W,H);}else{cx.drawImage(video,0,0,W,H);}drawCaptions(cx,W,H,video.currentTime);};
-  video.pause();video.currentTime=0;video.playbackRate=1;$('rate').value='1';drawFrame();
-  const stream=cv.captureStream(30);dest.stream.getAudioTracks().forEach(tr=>stream.addTrack(tr));
-  const vbr=Math.min(20e6,Math.max(8e6,Math.round(W*H*30*0.16)));
+  const drawFrame=t=>{if(isAudio){cx.fillStyle=st.bg;cx.fillRect(0,0,W,H);}else{cx.drawImage(video,0,0,W,H);}drawCaptions(cx,W,H,t);};
+  video.pause();video.currentTime=0;video.playbackRate=1;$('rate').value='1';drawFrame(0);
+  // Une image enregistrée par image réelle de la vidéo (au lieu du rythme de l'écran) : pas de saccades, sous-titres calés
+  const useRVFC=!isAudio&&'requestVideoFrameCallback' in HTMLVideoElement.prototype;
+  let stream=cv.captureStream(useRVFC?0:30);let vtrack=stream.getVideoTracks()[0];
+  const manual=useRVFC&&vtrack&&typeof vtrack.requestFrame==='function';
+  if(useRVFC&&!manual){stream=cv.captureStream(30);vtrack=stream.getVideoTracks()[0];}
+  dest.stream.getAudioTracks().forEach(tr=>stream.addTrack(tr));
+  const vbr=isMobile?Math.min(10e6,Math.max(5e6,Math.round(W*H*30*0.12))):Math.min(20e6,Math.max(8e6,Math.round(W*H*30*0.16)));
   const chunks=[];
   try{recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:vbr,audioBitsPerSecond:192000});}
   catch(e){recorder=new MediaRecorder(stream,{mimeType:mime});}
   recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
   const done=new Promise(res=>recorder.onstop=res);
   recording=true;recCancel=false;$('rec').disabled=true;$('rec-stop').hidden=false;$('recprog').hidden=false;
+  // Pendant la fabrication, l'écran montre exactement la vidéo produite
+  cv.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000';stage.appendChild(cv);cap.style.visibility='hidden';
   speaker.gain.value=0.25;
-  recorder.start(1000);
   const playP=video.play();
   (async()=>{
     let lock=null;try{lock=await navigator.wakeLock.request('screen');}catch(e){}
-    let raf;const frame=()=>{drawFrame();
-      $('recprogi').style.width=Math.round(video.currentTime/video.duration*100)+'%';
-      const sec=Math.floor(video.currentTime);if(sec!==frame.sec){frame.sec=sec;recMsg('Fabrication de la vidéo en HD… '+fmt(video.currentTime).slice(3,8)+' / '+fmt(video.duration).slice(3,8)+" (garde l'écran allumé)");}
-      raf=requestAnimationFrame(frame);};
-    frame();
+    let stop=false,raf=0,lastSec=-1;
+    const progress=t=>{const sec=Math.floor(t);if(sec!==lastSec){lastSec=sec;$('recprogi').style.width=Math.round(t/video.duration*100)+'%';recMsg('Fabrication de la vidéo… '+fmt(t).slice(3,8)+' / '+fmt(video.duration).slice(3,8)+" (garde l'écran allumé)");}};
+    const onFrame=(nowTs,meta)=>{if(stop)return;const t=meta?meta.mediaTime:video.currentTime;drawFrame(t);if(manual)vtrack.requestFrame();progress(t);video.requestVideoFrameCallback(onFrame);};
+    const onRaf=()=>{if(stop)return;drawFrame(video.currentTime);progress(video.currentTime);raf=requestAnimationFrame(onRaf);};
+    const onWait=()=>{if(recorder.state==='recording')recorder.pause();};
+    const onPlaying=()=>{if(recorder.state==='paused')recorder.resume();};
+    video.addEventListener('waiting',onWait);video.addEventListener('playing',onPlaying);
     video.addEventListener('ended',()=>recorder.state!=='inactive'&&recorder.stop(),{once:true});
-    try{await playP;}catch(e){recCancel=true;recorder.stop();recording=false;recMsg("La lecture a été bloquée. Appuie à nouveau sur « Télécharger la vidéo sous-titrée ».",true);}
-    await done;cancelAnimationFrame(raf);
+    try{await playP;}catch(e){recCancel=true;recording=false;recMsg("La lecture a été bloquée. Appuie à nouveau sur « Télécharger la vidéo sous-titrée ».",true);}
+    if(!recCancel){
+      // L'enregistrement démarre au moment exact où la vidéo joue : son et image partent ensemble
+      recorder.start(1000);
+      if(useRVFC)video.requestVideoFrameCallback(onFrame);else onRaf();
+    }else if(recorder.state==='inactive'){recorder.start();recorder.stop();}
+    await done;stop=true;cancelAnimationFrame(raf);
+    video.removeEventListener('waiting',onWait);video.removeEventListener('playing',onPlaying);
     try{srcNode.disconnect(dest);}catch(e){}speaker.gain.value=1;try{lock&&lock.release();}catch(e){}
-    recording=false;$('rec').disabled=false;$('rec-stop').hidden=true;$('recprog').hidden=true;
+    cv.remove();cap.style.visibility='';
+    recording=false;$('rec').disabled=false;$('rec-stop').hidden=true;$('recprog').hidden=true;drawPreview();
     if(recCancel){if(!$('status').classList.contains('err'))status('Fabrication annulée.',false,['go-rec']);return;}
     const ext=mime.includes('mp4')?'mp4':'webm';
     const blob=new Blob(chunks,{type:mime.split(';')[0]});
