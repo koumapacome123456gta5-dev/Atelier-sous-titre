@@ -1,0 +1,599 @@
+<title>Atelier Sous-titres</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Montserrat:wght@600;800;900&display=swap">
+<style>
+/* Layout: régie de sous-titrage — écran, transport et styles à gauche ; la bande des sous-titres et l'export à droite ; une colonne sur téléphone */
+:root{
+  --bg:#eef0f3; --panel:#ffffff; --ink:#151a22; --muted:#5d6676; --line:#d6dbe3;
+  --accent:#1f4fd6; --accent-ink:#ffffff; --sub:#ffd84a; --stage:#0d1117; --warn:#b4231b; --ok:#1d7a46; --soft:#e3e8f1;
+  --f-display:"Familjen Grotesk","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f131a; --panel:#171c25; --ink:#e8ebf1; --muted:#97a1b3; --line:#2a313d;
+  --accent:#6f95ff; --accent-ink:#0c1020; --sub:#ffd84a; --stage:#05070a; --warn:#ff7b70; --ok:#5fd394; --soft:#202735; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f131a; --panel:#171c25; --ink:#e8ebf1; --muted:#97a1b3; --line:#2a313d;
+  --accent:#6f95ff; --accent-ink:#0c1020; --sub:#ffd84a; --stage:#05070a; --warn:#ff7b70; --ok:#5fd394; --soft:#202735; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+.status{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--ok);border-radius:var(--r);padding:12px 14px}
+.status.err{border-left-color:var(--warn)}
+.status p{margin:0;font-weight:600;min-width:0;overflow-wrap:anywhere}
+.status small{display:block;font-weight:400;color:var(--muted)}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--f-body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.wrap{max-width:1240px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+h1{font:700 clamp(26px,4vw,36px)/1.05 var(--f-display);margin:0;letter-spacing:-.01em;text-wrap:balance}
+h1 span{background:var(--sub);color:#151a22;padding:0 .18em;border-radius:3px}
+.tag{font:500 12px var(--f-mono);color:var(--muted);letter-spacing:.04em}
+h2{font:700 13px var(--f-display);text-transform:uppercase;letter-spacing:.09em;margin:0;color:var(--muted)}
+.grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0}
+button,.btn{font:600 14px var(--f-body);border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:8px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+button:hover,.btn:hover{border-color:var(--accent)}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,.btn:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+button.primary,.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.ghost{background:transparent}
+button:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.stagewrap{display:flex;justify-content:center}
+.stage{position:relative;background:var(--stage);border-radius:8px;overflow:hidden;aspect-ratio:16/9;width:100%;max-width:100%}
+.stage video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.stage .empty{position:absolute;inset:0;color:#aab3c2;text-align:center;padding:20px;font-size:14px;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center}
+.stage .empty b{font:700 18px var(--f-display);color:#fff}
+.stage .audioface{color:#aab3c2;font:500 13px var(--f-mono);position:absolute;top:12px;left:14px;right:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.transport{display:flex;flex-direction:column;gap:10px}
+.tc{font:500 15px var(--f-mono);font-variant-numeric:tabular-nums}
+.bar{position:relative;height:34px;background:var(--soft);border-radius:6px;cursor:pointer;overflow:hidden}
+.bar .cue{position:absolute;top:6px;bottom:6px;background:var(--accent);opacity:.35;border-radius:3px}
+.bar .cue.on{opacity:.9}
+.bar .head{position:absolute;top:0;bottom:0;width:2px;background:var(--warn)}
+.bar .mark{position:absolute;top:0;bottom:0;width:2px;background:var(--ok)}
+.sect{display:flex;flex-direction:column;gap:10px;border-top:1px dashed var(--line);padding-top:14px}
+.sect textarea{width:100%;min-height:62px;resize:vertical;font:500 16px/1.4 var(--f-body);padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+.hint{font-size:13px;color:var(--muted);max-width:65ch;margin:0}
+kbd{font:500 12px var(--f-mono);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--bg)}
+.presets{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px}
+.preset{flex-direction:column;align-items:stretch;padding:0;overflow:hidden;gap:0;white-space:normal}
+.preset .sw{height:52px;background:#0d1117;display:grid;place-items:center;font:900 15px Montserrat,"Arial Black",sans-serif;color:#fff;letter-spacing:.01em;padding:0 6px;text-align:center}
+.preset .nm{font:600 13px var(--f-body);padding:6px 8px;text-align:left}
+.preset[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+.sw .k{color:var(--hl,#ffd84a)}
+.sw .bx{background:var(--hl,#ffd84a);color:#111;border-radius:5px;padding:1px 5px}
+.sw .cl{background:rgba(0,0,0,.75);color:#ffd84a;font:600 13px var(--f-body);padding:2px 6px}
+.sw .st{-webkit-text-stroke:1px #000;paint-order:stroke}
+.ctrls{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.ctrls label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.ctrls .inline{flex-direction:row;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--ink)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+input[type=color]{width:100%;height:36px;border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:2px}
+.list{display:flex;flex-direction:column;gap:8px;max-height:70vh;overflow:auto;padding-right:2px}
+.item{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:8px;align-items:start;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.item.on{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.item .n{font:500 12px var(--f-mono);color:var(--muted);padding-top:6px;text-align:right}
+.item .times{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px}
+.item input{font:500 13px var(--f-mono);font-variant-numeric:tabular-nums;width:110px;padding:4px 6px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink)}
+.item input.bad{border-color:var(--warn)}
+.item textarea{width:100%;font:15px/1.4 var(--f-body);padding:6px 8px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink);resize:vertical;min-height:44px}
+.item .side{display:flex;flex-direction:column;gap:4px}
+.item .side button{padding:5px 8px;font-size:13px;justify-content:center}
+.item .meta{font:12px var(--f-mono);color:var(--muted)}
+.item .meta.warn{color:var(--warn)}
+.arrow{color:var(--muted);font-family:var(--f-mono)}
+.badge{font:600 11px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;background:var(--sub);color:#151a22;border-radius:4px;padding:2px 6px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:600;max-width:calc(100% - 32px);z-index:20}
+.prog{height:8px;background:var(--soft);border-radius:4px;overflow:hidden}
+.prog i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+.msg{font-size:13px;color:var(--muted);margin:0}
+.msg.err{color:var(--warn)}
+select{font:500 14px var(--f-body);padding:7px 8px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+.out{width:100%;min-height:120px;font:13px/1.45 var(--f-mono);padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+.filebtn{position:relative;overflow:hidden}
+.filebtn input{position:absolute;inset:0;opacity:0;cursor:pointer}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Atelier <span>Sous-titres</span></h1>
+      <div class="tag">SOUS-TITRES ANIMÉS · SRT · VTT · VIDÉO INCRUSTÉE</div>
+    </div>
+    <div class="row">
+      <label class="btn filebtn primary">Choisir une vidéo à sous-titrer<input id="media-in" type="file" accept="video/*,audio/*"></label>
+      <label class="btn filebtn">Importer .srt / .vtt<input id="subs-in" type="file" accept=".srt,.vtt,.txt,text/plain"></label>
+    </div>
+  </header>
+
+  <div class="status" id="status" hidden><p id="status-t"></p><div class="row" id="status-actions"><button id="go-auto" class="primary">Transcrire automatiquement</button><button id="go-manual">Écrire moi-même</button></div></div>
+
+  <div class="grid">
+    <section class="panel" aria-label="Lecteur et style">
+      <div class="stagewrap">
+        <div class="stage" id="stage">
+          <video id="video" playsinline preload="auto" hidden></video>
+          <div class="audioface" id="audioface" hidden></div>
+          <div class="empty" id="empty"><b>Aucun fichier chargé</b>Ouvre une vidéo (MP4, MOV, WebM) ou un son (MP3, WAV, M4A).<br>Tout reste sur ton appareil, rien n'est envoyé.</div>
+          <canvas id="cap"></canvas>
+        </div>
+      </div>
+      <div class="transport">
+        <div class="bar" id="bar" title="Cliquer pour se déplacer"></div>
+        <div class="row" style="justify-content:space-between">
+          <div class="row">
+            <button id="back" title="Reculer de 2 s (Alt+←)">−2 s</button>
+            <button id="play" class="primary" style="min-width:96px;justify-content:center">Lecture</button>
+            <button id="fwd" title="Avancer de 2 s (Alt+→)">+2 s</button>
+            <select id="rate" aria-label="Vitesse"><option value="0.5">×0,5</option><option value="0.75">×0,75</option><option value="1" selected>×1</option><option value="1.25">×1,25</option></select>
+          </div>
+          <div class="tc"><span id="cur">00:00:00,000</span> <span class="arrow">/</span> <span id="dur">00:00:00,000</span></div>
+        </div>
+      </div>
+
+      <div class="sect">
+        <h2>Style des sous-titres</h2>
+        <div class="presets" id="presets"></div>
+        <div class="ctrls">
+          <label>Mots à l'écran<select id="st-words"><option value="1">1 mot</option><option value="2">2 mots</option><option value="3">3 mots</option><option value="4">4 mots</option><option value="5">5 mots</option><option value="0">Phrase entière</option></select></label>
+          <label>Position<select id="st-pos"><option value="bas">Bas</option><option value="centre">Centre</option><option value="haut">Haut</option></select></label>
+          <label>Taille<input id="st-size" type="range" min="3" max="14" step="0.5"></label>
+          <label>Couleur du mot actif<input id="st-hl" type="color"></label>
+          <label class="inline"><input id="st-upper" type="checkbox"> Majuscules</label>
+          <label class="inline"><input id="st-anim" type="checkbox"> Animation d'entrée</label>
+        </div>
+        <div class="ctrls" id="audio-fmt" hidden>
+          <label>Format de la vidéo (son)<select id="st-ratio"><option value="16:9">Paysage 16:9</option><option value="9:16">Vertical 9:16 (TikTok, Reels)</option><option value="1:1">Carré 1:1</option></select></label>
+          <label>Fond<input id="st-bg" type="color" value="#141a2a"></label>
+        </div>
+      </div>
+
+      <div class="sect">
+        <h2>Saisie rapide</h2>
+        <div class="row">
+          <button id="mark" title="Marquer le début (Alt+D)">Marquer le début</button>
+          <span class="tc" id="markv" style="color:var(--muted);font-size:13px">début : après le dernier sous-titre</span>
+        </div>
+        <textarea id="quick" placeholder="Tape ce que tu entends, puis Entrée à la fin de la phrase…"></textarea>
+        <div class="row"><button id="add" class="primary">Ajouter le sous-titre (Entrée)</button></div>
+        <p class="hint">Lance la lecture, écris la phrase, appuie sur <kbd>Entrée</kbd> quand elle se termine : le sous-titre va du début marqué (ou de la fin du précédent) jusqu'à maintenant. <kbd>Échap</kbd> met en pause ou relance, <kbd>Maj</kbd>+<kbd>Entrée</kbd> passe à la ligne.</p>
+      </div>
+
+      <div class="sect">
+        <h2 id="auto-h">Transcription automatique</h2>
+        <p class="hint">Whisper reconnaît la parole en français et crée les sous-titres horodatés, directement dans ton navigateur. Le modèle se télécharge une seule fois (environ 80 Mo pour Rapide, 250 Mo pour Précis). Fonctionne mieux sur ordinateur, dans Chrome ou Edge.</p>
+        <div class="row">
+          <select id="model" aria-label="Modèle"><option value="onnx-community/whisper-base">Rapide (base)</option><option value="onnx-community/whisper-small">Précis (small)</option></select>
+          <button id="auto" class="primary" disabled>Transcrire le fichier</button>
+        </div>
+        <div class="prog" id="prog" hidden><i id="progi"></i></div>
+        <p class="msg" id="automsg">Ouvre d'abord un fichier.</p>
+      </div>
+    </section>
+
+    <section class="panel" aria-label="Sous-titres et export">
+      <div class="row" style="justify-content:space-between">
+        <h2>Sous-titres <span id="count" class="tc"></span></h2>
+        <span id="sample" class="badge" hidden>Exemple</span>
+      </div>
+      <div class="row">
+        <button id="shiftm" class="ghost" title="Décaler tout de −0,5 s">Tout −0,5 s</button>
+        <button id="shiftp" class="ghost" title="Décaler tout de +0,5 s">Tout +0,5 s</button>
+        <button id="clear" class="ghost">Tout effacer</button>
+      </div>
+      <div class="row" id="clearconf" hidden><span class="msg err">Effacer tous les sous-titres ?</span><button id="clearyes" class="primary">Oui, effacer</button><button id="clearno">Annuler</button></div>
+      <div class="list" id="list"></div>
+
+      <div class="sect">
+        <h2>Vidéo avec sous-titres incrustés</h2>
+        <p class="hint">Crée une vidéo prête à publier, avec le style choisi. L'enregistrement se fait en temps réel : une vidéo d'une minute prend une minute. Garde cet onglet ouvert pendant ce temps.</p>
+        <div class="row">
+          <button id="rec" class="primary">Créer la vidéo sous-titrée</button>
+          <button id="rec-stop" hidden>Annuler</button>
+        </div>
+        <div class="prog" id="recprog" hidden><i id="recprogi"></i></div>
+        <p class="msg" id="recmsg"></p>
+      </div>
+
+      <div class="sect">
+        <h2>Fichiers de sous-titres</h2>
+        <div class="row">
+          <button id="dl-srt">Télécharger .srt</button>
+          <button id="dl-vtt">Télécharger .vtt</button>
+          <button id="cp-srt" class="ghost">Copier le SRT</button>
+          <button id="cp-txt" class="ghost">Copier le texte seul</button>
+        </div>
+        <textarea id="out" class="out" readonly aria-label="Aperçu SRT"></textarea>
+      </div>
+    </section>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(function(){
+const $=id=>document.getElementById(id);
+const video=$('video'), stage=$('stage'), cap=$('cap'), bar=$('bar'), list=$('list');
+let cues=[], mediaName='sous-titres', markStart=null, isSample=false, mediaFile=null, isAudio=false;
+const inClaude=!!(window.claude&&window.claude.use)||/claudeusercontent|claude\.ai/.test(location.hostname);
+const KEY='atelier-sous-titres-v1', SKEY='atelier-sous-titres-style-v1';
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- styles animés ---------- */
+const PRESETS={
+  impact:{nm:'Impact',sw:'<span class="st">C\'EST </span><span class="k st">PARTI</span>',words:3,size:8,upper:true,hl:'#ffd84a',anim:true,mode:'pop'},
+  karaoke:{nm:'Karaoké',sw:'<span>On y </span><span class="k">va</span>',words:5,size:6,upper:false,hl:'#4ade80',anim:false,mode:'color'},
+  bulle:{nm:'Bulle',sw:'<span>Trop </span><span class="bx">bien</span>',words:4,size:6.5,upper:false,hl:'#ffd84a',anim:true,mode:'box'},
+  mot:{nm:'Mot à mot',sw:'<span class="k st" style="font-size:20px">WOW</span>',words:1,size:12,upper:true,hl:'#ff5a5a',anim:true,mode:'pop'},
+  classique:{nm:'Classique',sw:'<span class="cl">Bonjour à tous</span>',words:0,size:5,upper:false,hl:'#ffd84a',anim:false,mode:'classic'}
+};
+let st={preset:'impact',words:3,size:8,upper:true,hl:'#ffd84a',anim:true,pos:'bas',ratio:'16:9',bg:'#141a2a'};
+try{Object.assign(st,JSON.parse(localStorage.getItem(SKEY)||'{}'));}catch(e){}
+function saveStyle(){try{localStorage.setItem(SKEY,JSON.stringify(st));}catch(e){}}
+function renderPresets(){
+  const box=$('presets');box.innerHTML='';
+  for(const k in PRESETS){const p=PRESETS[k];const b=document.createElement('button');b.className='preset';b.setAttribute('aria-pressed',st.preset===k);b.style.setProperty('--hl',p.hl);
+    b.innerHTML='<div class="sw">'+p.sw+'</div><div class="nm">'+p.nm+'</div>';
+    b.onclick=()=>{st.preset=k;Object.assign(st,{words:p.words,size:p.size,upper:p.upper,hl:p.hl,anim:p.anim});syncCtrls();saveStyle();renderPresets();drawPreview();};
+    box.appendChild(b);}
+}
+function syncCtrls(){$('st-words').value=st.words;$('st-pos').value=st.pos;$('st-size').value=st.size;$('st-hl').value=st.hl;$('st-upper').checked=st.upper;$('st-anim').checked=st.anim;$('st-ratio').value=st.ratio;$('st-bg').value=st.bg;}
+[['st-words','words',v=>+v],['st-pos','pos',v=>v],['st-size','size',v=>+v],['st-hl','hl',v=>v],['st-ratio','ratio',v=>v],['st-bg','bg',v=>v]].forEach(([id,k,f])=>$(id).addEventListener('input',e=>{st[k]=f(e.target.value);saveStyle();if(k==='ratio')fitStage();drawPreview();}));
+$('st-upper').onchange=e=>{st.upper=e.target.checked;saveStyle();drawPreview();};
+$('st-anim').onchange=e=>{st.anim=e.target.checked;saveStyle();drawPreview();};
+
+/* ---------- temps ---------- */
+function fmt(t,sep=','){t=Math.max(0,t||0);const ms=Math.round(t*1000);const h=Math.floor(ms/3600000),m=Math.floor(ms%3600000/60000),s=Math.floor(ms%60000/1000),x=ms%1000;return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')+sep+String(x).padStart(3,'0');}
+function parseTC(str){str=String(str).trim().replace(',','.');if(!str)return NaN;const p=str.split(':').map(Number);if(p.some(isNaN))return NaN;let t=0;for(const v of p)t=t*60+v;return t;}
+function toast(t){const el=$('toast');el.textContent=t;el.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>el.hidden=true,2600);}
+
+/* ---------- stockage local ---------- */
+function save(){if(isSample)return;try{localStorage.setItem(KEY,JSON.stringify({cues,mediaName}));}catch(e){}}
+function load(){try{const d=JSON.parse(localStorage.getItem(KEY)||'null');if(d&&Array.isArray(d.cues)&&d.cues.length){cues=d.cues;mediaName=d.mediaName||mediaName;return true;}}catch(e){}return false;}
+function leaveSample(clear){if(isSample){isSample=false;if(clear)cues=[];$('sample').hidden=true;}}
+
+/* ---------- formats ---------- */
+function wrapLines(text){text=text.replace(/\s+/g,' ').trim();if(text.length<=42)return text;const w=text.split(' ');let best=text,bd=1e9,acc='';for(let i=0;i<w.length-1;i++){acc+=(i?' ':'')+w[i];const d=Math.abs(acc.length-(text.length-acc.length-1));if(d<bd){bd=d;best=acc+'\n'+w.slice(i+1).join(' ');}}return best;}
+function sorted(){return cues.slice().sort((a,b)=>a.s-b.s);}
+function toSRT(){return sorted().map((c,i)=>(i+1)+'\n'+fmt(c.s)+' --> '+fmt(c.e)+'\n'+c.t.trim()+'\n').join('\n');}
+function toVTT(){return 'WEBVTT\n\n'+sorted().map((c,i)=>(i+1)+'\n'+fmt(c.s,'.')+' --> '+fmt(c.e,'.')+'\n'+c.t.trim()+'\n').join('\n');}
+function parseSubs(txt){const out=[];txt=txt.replace(/\r/g,'').replace(/^﻿/,'');for(const block of txt.split(/\n\s*\n/)){const lines=block.split('\n').filter(l=>l.trim()!=='');const i=lines.findIndex(l=>l.includes('-->'));if(i<0)continue;const [a,b]=lines[i].split('-->');const s=parseTC(a),e=parseTC(String(b).trim().split(/\s+/)[0]);const t=lines.slice(i+1).join('\n').replace(/<[^>]+>/g,'');if(!isNaN(s)&&!isNaN(e))out.push({s,e,t});}return out;}
+
+/* ---------- liste ---------- */
+function render(){
+  cues=sorted();const cs=cues;
+  $('count').textContent=cs.length?'· '+cs.length:'';
+  list.innerHTML='';
+  if(!cs.length){const p=document.createElement('p');p.className='msg';p.textContent="Aucun sous-titre pour l'instant. Utilise la saisie rapide, la transcription automatique ou importe un fichier .srt.";list.appendChild(p);}
+  cs.forEach((c,i)=>{
+    const el=document.createElement('div');el.className='item';el.dataset.i=i;
+    const dur=c.e-c.s, cps=dur>0?c.t.replace(/\s/g,'').length/dur:0;
+    el.innerHTML='<div class="n">'+(i+1)+'</div><div style="min-width:0"><div class="times"><input id="s'+i+'" aria-label="Début"> <span class="arrow">→</span> <input id="e'+i+'" aria-label="Fin"></div><textarea id="t'+i+'" rows="2" aria-label="Texte"></textarea><div class="meta'+(dur<=0||cps>20?' warn':'')+'">'+(dur>0?dur.toFixed(1).replace('.',',')+' s · '+Math.round(cps)+' car./s'+(cps>20?' (trop rapide à lire)':''):'Durée invalide')+'</div></div><div class="side"><button data-a="go" title="Écouter ce passage">▶</button><button data-a="set" title="Mettre la fin à la position actuelle">Fin ici</button><button data-a="del" title="Supprimer">✕</button></div>';
+    list.appendChild(el);
+    const si=el.querySelector('#s'+i),ei=el.querySelector('#e'+i),ti=el.querySelector('#t'+i);
+    si.value=fmt(c.s);ei.value=fmt(c.e);ti.value=c.t;
+    const upd=(inp,key)=>inp.addEventListener('change',()=>{const v=parseTC(inp.value);if(isNaN(v)){inp.classList.add('bad');toast('Format attendu : 00:01:23,450');return;}leaveSample();c[key]=v;save();render();});
+    upd(si,'s');upd(ei,'e');
+    ti.addEventListener('input',()=>{leaveSample();c.t=ti.value;save();drawPreview();updateOut();});
+    el.querySelector('[data-a="go"]').onclick=()=>{if(!hasMedia())return toast("Ouvre d'abord un fichier");video.currentTime=c.s;video.play();};
+    el.querySelector('[data-a="set"]').onclick=()=>{if(!hasMedia())return toast("Ouvre d'abord un fichier");leaveSample();c.e=video.currentTime;save();render();};
+    el.querySelector('[data-a="del"]').onclick=()=>{leaveSample();cues.splice(cues.indexOf(c),1);save();render();};
+  });
+  lastActive=-2;drawBar();drawPreview();updateOut();
+}
+function updateOut(){$('out').value=cues.length?toSRT():'';}
+function hasMedia(){return !!video.src;}
+
+/* ---------- barre ---------- */
+function total(){return (video.duration&&isFinite(video.duration))?video.duration:Math.max(12,...cues.map(c=>c.e));}
+function drawBar(){
+  const T=total();bar.innerHTML='';
+  for(const c of cues){const d=document.createElement('div');d.className='cue';d.style.left=(c.s/T*100)+'%';d.style.width=Math.max(.3,(c.e-c.s)/T*100)+'%';bar.appendChild(d);}
+  if(markStart!=null){const m=document.createElement('div');m.className='mark';m.style.left=(markStart/T*100)+'%';bar.appendChild(m);}
+  const h=document.createElement('div');h.className='head';h.id='head';bar.appendChild(h);moveHead();
+}
+function moveHead(){const h=$('head');if(h)h.style.left=(now()/total()*100)+'%';}
+bar.addEventListener('click',e=>{const r=bar.getBoundingClientRect();const t=(e.clientX-r.left)/r.width*total();if(hasMedia())video.currentTime=t;else{demoT=t;demoStart=performance.now()-t*1000;}});
+
+/* ---------- moteur de rendu des sous-titres (aperçu + export) ---------- */
+let demoT=0,demoStart=performance.now();
+function now(){return hasMedia()?video.currentTime:demoT;}
+function wordTimes(c){
+  const words=c.t.replace(/\s+/g,' ').trim().split(' ').filter(Boolean);
+  const wts=words.map(w=>w.length+2),sum=wts.reduce((a,b)=>a+b,0)||1;let acc=c.s;
+  return words.map((w,i)=>{const d=(c.e-c.s)*wts[i]/sum;const o={w,s:acc,e:acc+d};acc+=d;return o;});
+}
+function pageAt(t){
+  const c=cues.find(c=>t>=c.s&&t<c.e);if(!c)return null;
+  const ws=wordTimes(c);if(!ws.length)return null;
+  const n=st.words>0?st.words:ws.length;
+  for(let i=0;i<ws.length;i+=n){const pg=ws.slice(i,i+n);const e=pg[pg.length-1].e;if(t<e||i+n>=ws.length)return {words:pg,s:pg[0].s,active:pg.findIndex(w=>t>=w.s&&t<w.e)};}
+  return null;
+}
+function fontFor(mode,fs){return (mode==='classic'?'600 ':'900 ')+fs+'px Montserrat,"Arial Black",Arial,sans-serif';}
+function drawCaptions(ctx,W,H,t){
+  const pg=pageAt(t);if(!pg)return;
+  const mode=PRESETS[st.preset]?PRESETS[st.preset].mode:'pop';
+  const base=Math.min(W,H),fs=Math.round(base*st.size/100);
+  ctx.font=fontFor(mode,fs);ctx.textBaseline='alphabetic';
+  const words=pg.words.map(w=>st.upper?w.w.toLocaleUpperCase('fr-FR'):w.w);
+  const space=ctx.measureText(' ').width,maxW=W*0.86;
+  const lines=[[]];let lw=0;
+  words.forEach((w,i)=>{const ww=ctx.measureText(w).width;if(lines[lines.length-1].length&&lw+space+ww>maxW){lines.push([]);lw=0;}const L=lines[lines.length-1];L.push({i,w,ww});lw+=(L.length>1?space:0)+ww;});
+  const lh=fs*1.22,blockH=lines.length*lh;
+  let top=st.pos==='haut'?H*0.12:st.pos==='centre'?(H-blockH)/2:H*0.88-blockH;
+  let k=1;if(st.anim&&!reduce){const p=Math.min(1,(t-pg.s)/0.14);k=0.82+0.18*(1-Math.pow(1-p,3));}
+  ctx.save();ctx.translate(W/2,top+blockH/2);ctx.scale(k,k);ctx.translate(-W/2,-(top+blockH/2));
+  ctx.lineJoin='round';
+  lines.forEach((L,li)=>{
+    const total=L.reduce((a,b)=>a+b.ww,0)+space*(L.length-1);let x=(W-total)/2;const y=top+li*lh+fs*0.95;
+    if(mode==='classic'){ctx.fillStyle='rgba(0,0,0,0.72)';ctx.fillRect(x-fs*0.3,y-fs*0.95,total+fs*0.6,lh);}
+    L.forEach(o=>{
+      const on=o.i===pg.active;let fill='#ffffff';
+      if(mode==='classic')fill='#ffd84a';
+      else if(on&&(mode==='pop'||mode==='color'))fill=st.hl;
+      ctx.save();
+      if(on&&mode==='pop'){const cx=x+o.ww/2,cy=y-fs*0.35;ctx.translate(cx,cy);ctx.scale(1.1,1.1);ctx.translate(-cx,-cy);}
+      if(on&&mode==='box'){ctx.fillStyle=st.hl;const px=fs*0.18;ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x-px,y-fs*0.9,o.ww+px*2,fs*1.15,fs*0.18);else ctx.rect(x-px,y-fs*0.9,o.ww+px*2,fs*1.15);ctx.fill();fill='#111111';}
+      if(mode==='pop'||mode==='color'){ctx.lineWidth=fs*0.16;ctx.strokeStyle='#000000';ctx.strokeText(o.w,x,y);}
+      if(mode==='box'&&!on){ctx.shadowColor='rgba(0,0,0,.85)';ctx.shadowBlur=fs*0.25;ctx.shadowOffsetY=fs*0.05;}
+      ctx.fillStyle=fill;ctx.fillText(o.w,x,y);
+      ctx.restore();
+      x+=o.ww+space;
+    });
+  });
+  ctx.restore();
+}
+function drawPreview(){
+  const r=stage.getBoundingClientRect(),dpr=Math.min(2,window.devicePixelRatio||1);
+  const W=Math.max(1,Math.round(r.width*dpr)),H=Math.max(1,Math.round(r.height*dpr));
+  if(cap.width!==W||cap.height!==H){cap.width=W;cap.height=H;}
+  const ctx=cap.getContext('2d');ctx.clearRect(0,0,W,H);
+  if(isAudio||!hasMedia()){ctx.fillStyle=isAudio?st.bg:'transparent';if(isAudio)ctx.fillRect(0,0,W,H);}
+  drawCaptions(ctx,W,H,now());
+  const t=now();const idx=cues.findIndex(c=>t>=c.s&&t<c.e);
+  if(idx!==lastActive){lastActive=idx;list.querySelectorAll('.item').forEach(el=>el.classList.toggle('on',+el.dataset.i===idx));bar.querySelectorAll('.cue').forEach((el,i)=>el.classList.toggle('on',i===idx));
+    if(idx>=0&&hasMedia()&&!video.paused&&!document.activeElement.closest('.item')){const el=list.querySelector('.item[data-i="'+idx+'"]');el&&el.scrollIntoView({block:'nearest'});}}
+}
+let lastActive=-2;
+function loop(){
+  if(!hasMedia()&&isSample){demoT=((performance.now()-demoStart)/1000)%11;$('cur').textContent=fmt(demoT);}
+  if(hasMedia()){$('cur').textContent=fmt(video.currentTime);}
+  moveHead();drawPreview();requestAnimationFrame(loop);
+}
+function fitStage(){
+  let ratio=16/9;
+  if(hasMedia()&&!isAudio&&video.videoWidth)ratio=video.videoWidth/video.videoHeight;
+  else if(isAudio){const [a,b]=st.ratio.split(':').map(Number);ratio=a/b;}
+  stage.style.aspectRatio=String(ratio);
+  stage.style.width=ratio<1.2?'min(100%, calc(68vh * '+ratio+'))':'100%';
+  $('audio-fmt').hidden=!isAudio;
+}
+window.addEventListener('resize',drawPreview);
+
+/* ---------- lecteur ---------- */
+let triedData=false;
+function status(html,err,actions){$('status').hidden=false;$('status').classList.toggle('err',!!err);$('status-t').innerHTML=html;$('status-actions').hidden=!actions;}
+function esc(t){return String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+$('media-in').addEventListener('change',e=>{
+  const f=e.target.files[0];e.target.value='';if(!f)return;mediaFile=f;triedData=false;
+  if(video.src&&video.src.startsWith('blob:'))URL.revokeObjectURL(video.src);
+  isAudio=f.type.startsWith('audio')||/\.(mp3|wav|m4a|aac|ogg|flac|opus|amr)$/i.test(f.name);
+  video.hidden=isAudio;$('empty').hidden=true;
+  $('audioface').hidden=!isAudio;$('audioface').textContent=isAudio?'♪ '+f.name:'';
+  mediaName=f.name.replace(/\.[^.]+$/,'')||'sous-titres';
+  leaveSample(true);markStart=null;
+  status('Chargement de '+esc(f.name)+'…<small>'+(f.size/1e6).toFixed(1).replace('.',',')+' Mo</small>',false,false);
+  video.src=URL.createObjectURL(f);video.load();
+  fitStage();save();render();
+});
+video.addEventListener('error',()=>{
+  if(!mediaFile)return;
+  // Repli : certains affichages refusent les liens « blob: », on réessaie avec le fichier intégré
+  if(!triedData&&mediaFile.size<300e6){triedData=true;const r=new FileReader();r.onload=()=>{video.src=r.result;video.load();};r.onerror=()=>mediaError();r.readAsDataURL(mediaFile);return;}
+  mediaError();
+});
+function mediaError(){
+  video.removeAttribute('src');video.hidden=true;$('empty').hidden=false;$('audioface').hidden=true;
+  status("Impossible de lire « "+esc(mediaFile.name)+" ».<small>Ton navigateur ne reconnaît pas ce format. Essaie une vidéo MP4 (H.264) ou un son MP3. Les vidéos iPhone en HEVC se lisent mal hors de Safari : exporte-les en « Plus compatible ».</small>",true,false);
+  $('auto').disabled=true;mediaFile=null;
+}
+video.addEventListener('loadedmetadata',()=>{
+  $('dur').textContent=fmt(video.duration);fitStage();drawBar();
+  status('✓ '+esc(mediaFile?mediaFile.name:'Fichier')+' est chargé ('+fmt(video.duration).slice(3,8)+').'+(autoBlocked?'<small>Dans ce lien Claude, la transcription automatique est impossible : utilise le fichier soustitreur.html pour le mode automatique, ou écris les sous-titres ici.</small>':'<small>La transcription automatique démarre…</small>'),false,autoBlocked);
+  if(!autoBlocked&&mediaFile&&!transcribing){$('auto').disabled=false;$('auto').click();}
+});
+$('go-auto').onclick=()=>{$('auto-h').scrollIntoView({behavior:reduce?'auto':'smooth',block:'start'});if(!autoBlocked)$('auto').click();};
+$('go-manual').onclick=()=>{$('quick').scrollIntoView({behavior:reduce?'auto':'smooth',block:'center'});$('quick').focus({preventScroll:true});};
+video.addEventListener('play',()=>$('play').textContent='Pause');
+video.addEventListener('pause',()=>$('play').textContent='Lecture');
+function toggle(){if(!hasMedia())return toast("Ouvre d'abord un fichier");video.paused?video.play():video.pause();}
+$('play').onclick=toggle;
+$('back').onclick=()=>{if(hasMedia())video.currentTime=Math.max(0,video.currentTime-2);};
+$('fwd').onclick=()=>{if(hasMedia())video.currentTime=video.currentTime+2;};
+$('rate').onchange=e=>{video.playbackRate=+e.target.value;};
+
+/* ---------- saisie rapide ---------- */
+function setMark(){if(!hasMedia())return toast("Ouvre d'abord un fichier");markStart=video.currentTime;$('markv').textContent='début : '+fmt(markStart);drawBar();}
+$('mark').onclick=setMark;
+function addQuick(){
+  const txt=$('quick').value.trim();if(!txt)return;
+  if(!hasMedia())return toast("Ouvre d'abord un fichier");
+  leaveSample(true);
+  const t=video.currentTime;let s=markStart;
+  if(s==null){const prev=cues.filter(c=>c.e<=t+0.01).sort((a,b)=>b.e-a.e)[0];s=prev?prev.e:Math.max(0,t-3);}
+  if(t-s<0.3){toast('Le sous-titre est trop court : laisse avancer la lecture');return;}
+  cues.push({s,e:t,t:wrapLines(txt)});
+  $('quick').value='';markStart=null;$('markv').textContent='début : après le dernier sous-titre';
+  save();render();toast('Sous-titre ajouté');
+}
+$('add').onclick=addQuick;
+$('quick').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();addQuick();}});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){e.preventDefault();toggle();}
+  else if(e.altKey&&e.key==='ArrowLeft'){e.preventDefault();$('back').click();}
+  else if(e.altKey&&e.key==='ArrowRight'){e.preventDefault();$('fwd').click();}
+  else if(e.altKey&&e.code==='KeyD'){e.preventDefault();setMark();}
+});
+
+/* ---------- outils liste ---------- */
+function shift(d){leaveSample();cues.forEach(c=>{c.s=Math.max(0,c.s+d);c.e=Math.max(0,c.e+d);});save();render();}
+$('shiftm').onclick=()=>shift(-0.5);$('shiftp').onclick=()=>shift(0.5);
+$('clear').onclick=()=>{$('clearconf').hidden=false;};
+$('clearno').onclick=()=>{$('clearconf').hidden=true;};
+$('clearyes').onclick=()=>{cues=[];leaveSample();$('clearconf').hidden=true;try{localStorage.removeItem(KEY);}catch(e){}render();};
+$('subs-in').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;const got=parseSubs(await f.text());e.target.value='';if(!got.length)return toast("Aucun sous-titre trouvé dans ce fichier");leaveSample(true);cues=got;save();render();toast(got.length+' sous-titres importés');});
+
+/* ---------- téléchargements ---------- */
+const enc=new TextEncoder();
+function crc32(b){let c,t=crc32.t;if(!t){t=crc32.t=[];for(let n=0;n<256;n++){c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0;}}let x=-1;for(let i=0;i<b.length;i++)x=(x>>>8)^t[(x^b[i])&255];return (x^-1)>>>0;}
+function zip(files){const parts=[],central=[];let off=0;for(const f of files){const name=enc.encode(f.name),data=enc.encode(f.data),crc=crc32(data);const h=new DataView(new ArrayBuffer(30));h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint32(14,crc,true);h.setUint32(18,data.length,true);h.setUint32(22,data.length,true);h.setUint16(26,name.length,true);parts.push(new Uint8Array(h.buffer),name,data);const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint32(16,crc,true);c.setUint32(20,data.length,true);c.setUint32(24,data.length,true);c.setUint16(28,name.length,true);c.setUint32(42,off,true);central.push(new Uint8Array(c.buffer),name);off+=30+name.length+data.length;}
+  const cs=central.reduce((a,b)=>a+b.length,0);const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cs,true);e.setUint32(16,off,true);return new Blob([...parts,...central,new Uint8Array(e.buffer)],{type:'application/zip'});}
+
+async function offer(filename,data){
+  if(inClaude){
+    let dl=null;try{dl=await window.claude.use('downloads');}catch(e){}
+    if(!dl){toast("Le téléchargement n'est pas disponible ici : utilise « Copier »");return false;}
+    try{await dl.save({filename,data});toast('Fichier enregistré');return true;}
+    catch(err){if(err&&err.code==='declined')return false;toast(err&&err.code==='too_large'?'Fichier trop lourd pour cet affichage':"Le téléchargement n'a pas abouti");return false;}
+  }
+  const blob=data instanceof Blob?data:new Blob([data],{type:'text/plain;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},2000);return true;
+}
+// Dans Claude, les .srt et .vtt passent dans un .zip (format accepté) ; hors de Claude, téléchargement direct
+function subFile(ext,text){if(!cues.length)return toast('Rien à exporter pour le moment');if(inClaude)offer(mediaName+'-'+ext+'.zip',zip([{name:mediaName+'.'+ext,data:text}]));else offer(mediaName+'.'+ext,text);}
+$('dl-srt').onclick=()=>subFile('srt',toSRT());
+$('dl-vtt').onclick=()=>subFile('vtt',toVTT());
+async function copy(text,label){if(!cues.length)return toast('Rien à copier');try{await navigator.clipboard.writeText(text);toast(label+' copié');}catch(e){const o=$('out');o.value=text;o.focus();o.select();toast('Texte sélectionné : fais Copier');}}
+$('cp-srt').onclick=()=>copy(toSRT(),'SRT');
+$('cp-txt').onclick=()=>copy(sorted().map(c=>c.t.replace(/\n/g,' ')).join('\n'),'Texte');
+
+/* ---------- vidéo avec sous-titres incrustés ---------- */
+let actx=null,srcNode=null,speaker=null,recorder=null,recCancel=false;
+function recMsg(t,err){const m=$('recmsg');m.textContent=t;m.className='msg'+(err?' err':'');}
+$('rec').onclick=async()=>{
+  if(!hasMedia())return recMsg("Ouvre d'abord une vidéo ou un son.",true);
+  if(!cues.length)return recMsg("Ajoute d'abord des sous-titres.",true);
+  if(!window.MediaRecorder)return recMsg("Ton navigateur ne sait pas enregistrer de vidéo. Essaie Chrome ou Edge.",true);
+  const mime=['video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm'].find(m=>MediaRecorder.isTypeSupported(m));
+  if(!mime)return recMsg("Aucun format vidéo disponible dans ce navigateur.",true);
+  let W,H;
+  if(isAudio){const [a,b]=st.ratio.split(':').map(Number);if(a>=b){W=1280;H=Math.round(1280*b/a);}else{H=1280;W=Math.round(1280*a/b);}}
+  else{W=video.videoWidth;H=video.videoHeight;const sc=Math.min(1,1920/Math.max(W,H));W=Math.round(W*sc/2)*2;H=Math.round(H*sc/2)*2;}
+  const cv=document.createElement('canvas');cv.width=W;cv.height=H;const cx=cv.getContext('2d');
+  try{
+    if(!actx){actx=new (window.AudioContext||window.webkitAudioContext)();srcNode=actx.createMediaElementSource(video);speaker=actx.createGain();srcNode.connect(speaker);speaker.connect(actx.destination);}
+    await actx.resume();
+  }catch(e){return recMsg("Impossible de capter le son de ce fichier.",true);}
+  const dest=actx.createMediaStreamDestination();srcNode.connect(dest);
+  const stream=cv.captureStream(30);dest.stream.getAudioTracks().forEach(tr=>stream.addTrack(tr));
+  const chunks=[];recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:6e6});
+  recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
+  recCancel=false;$('rec').disabled=true;$('rec-stop').hidden=false;$('recprog').hidden=false;
+  speaker.gain.value=0.25;
+  const done=new Promise(res=>recorder.onstop=res);
+  video.pause();video.currentTime=0;video.playbackRate=1;$('rate').value='1';
+  await new Promise(r=>{video.addEventListener('seeked',r,{once:true});setTimeout(r,800);});
+  let raf;const frame=()=>{
+    if(isAudio){cx.fillStyle=st.bg;cx.fillRect(0,0,W,H);}else{cx.drawImage(video,0,0,W,H);}
+    drawCaptions(cx,W,H,video.currentTime);
+    $('recprogi').style.width=Math.round(video.currentTime/video.duration*100)+'%';
+    recMsg('Enregistrement… '+fmt(video.currentTime).slice(3,8)+' / '+fmt(video.duration).slice(3,8));
+    raf=requestAnimationFrame(frame);
+  };
+  frame();recorder.start(1000);
+  video.addEventListener('ended',()=>recorder.state!=='inactive'&&recorder.stop(),{once:true});
+  try{await video.play();}catch(e){recorder.stop();}
+  await done;cancelAnimationFrame(raf);
+  srcNode.disconnect(dest);speaker.gain.value=1;
+  $('rec').disabled=false;$('rec-stop').hidden=true;$('recprog').hidden=true;
+  if(recCancel){recMsg('Enregistrement annulé.');return;}
+  const ext=mime.includes('mp4')?'mp4':'webm';
+  const blob=new Blob(chunks,{type:mime.split(';')[0]});
+  recMsg('Vidéo prête ('+(blob.size/1e6).toFixed(1).replace('.',',')+' Mo, .'+ext+').');
+  await offer(mediaName+'-sous-titres.'+ext,blob);
+};
+$('rec-stop').onclick=()=>{recCancel=true;video.pause();if(recorder&&recorder.state!=='inactive')recorder.stop();};
+
+/* ---------- transcription automatique (Whisper dans le navigateur) ---------- */
+const workerCode=`
+import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.1';
+env.allowLocalModels=false;
+let asr=null,cur='';
+async function build(model){
+  const progress_callback=p=>self.postMessage({type:'progress',p});
+  let gpu=false;try{if(navigator.gpu){gpu=!!(await navigator.gpu.requestAdapter());}}catch(e){}
+  if(gpu){try{return await pipeline('automatic-speech-recognition',model,{device:'webgpu',dtype:{encoder_model:'fp32',decoder_model_merged:'q4'},progress_callback});}catch(e){}}
+  return await pipeline('automatic-speech-recognition',model,{device:'wasm',dtype:'q8',progress_callback});
+}
+self.onmessage=async e=>{
+  const {audio,model}=e.data;
+  try{
+    if(!asr||cur!==model){self.postMessage({type:'status',text:'Téléchargement du modèle…'});asr=await build(model);cur=model;}
+    self.postMessage({type:'status',text:'Transcription en cours… (peut prendre plusieurs minutes)'});
+    const out=await asr(audio,{language:'french',task:'transcribe',return_timestamps:true,chunk_length_s:30,stride_length_s:5});
+    self.postMessage({type:'done',out});
+  }catch(err){self.postMessage({type:'error',message:String((err&&err.message)||err)});}
+};`;
+let worker=null;
+const autoBlocked=inClaude;
+if(autoBlocked){$('auto').disabled=true;}
+let transcribing=false;
+function setMsg(t,err){const m=$('automsg');m.textContent=t;m.className='msg'+(err?' err':'');if(transcribing)status(esc(t),err,false);}
+async function decode(file){
+  const buf=await file.arrayBuffer();
+  const Ctx=window.AudioContext||window.webkitAudioContext;const ctx=new Ctx({sampleRate:16000});
+  const ab=await ctx.decodeAudioData(buf);try{ctx.close();}catch(e){}
+  if(ab.numberOfChannels===1)return ab.getChannelData(0);
+  const a=ab.getChannelData(0),b=ab.getChannelData(1),m=new Float32Array(a.length);for(let i=0;i<a.length;i++)m[i]=(a[i]+b[i])/2;return m;
+}
+function chunksToCues(chunks,dur){
+  const out=[];
+  for(const ch of chunks){let [s,e]=ch.timestamp;const t=(ch.text||'').trim();if(!t)continue;if(e==null)e=Math.min(dur||s+4,s+6);if(e<=s)e=s+1;
+    if(t.length<=84){out.push({s,e,t:wrapLines(t)});continue;}
+    const words=t.split(/\s+/),n=Math.ceil(t.length/80),per=Math.ceil(words.length/n),span=(e-s)/n;
+    for(let k=0;k<n;k++){const w=words.slice(k*per,(k+1)*per).join(' ');if(w)out.push({s:s+k*span,e:s+(k+1)*span,t:wrapLines(w)});}
+  }
+  return out;
+}
+$('auto').onclick=async()=>{
+  if(!mediaFile)return setMsg("Ouvre d'abord un fichier.",true);
+  const btn=$('auto');btn.disabled=true;transcribing=true;$('prog').hidden=false;$('progi').style.width='0%';
+  try{
+    setMsg('Lecture du son…');
+    const audio=await decode(mediaFile);
+    if(!worker)worker=new Worker(URL.createObjectURL(new Blob([workerCode],{type:'text/javascript'})),{type:'module'});
+    const files={};
+    await new Promise((resolve,reject)=>{
+      worker.onerror=ev=>reject(new Error((ev&&ev.message)||'worker'));
+      worker.onmessage=ev=>{const d=ev.data;
+        if(d.type==='progress'&&d.p&&d.p.status==='progress'&&d.p.total){files[d.p.file]=[d.p.loaded,d.p.total];let l=0,t=0;for(const k in files){l+=files[k][0];t+=files[k][1];}$('progi').style.width=Math.round(l/t*100)+'%';setMsg('Téléchargement du modèle… '+Math.round(l/1e6)+' / '+Math.round(t/1e6)+' Mo');}
+        else if(d.type==='status'){setMsg(d.text);if(d.text.startsWith('Transcription'))$('progi').style.width='100%';}
+        else if(d.type==='done'){const got=chunksToCues(d.out.chunks||[],video.duration);if(!got.length)setMsg('Aucune parole détectée dans ce fichier.',true);else{leaveSample(true);cues=got;save();render();setMsg(got.length+" sous-titres créés. Relis-les et corrige-les avant d'exporter.");transcribing=false;status("✓ "+got.length+" sous-titres créés automatiquement.<small>Regarde le résultat, choisis un style, puis appuie sur « Créer la vidéo sous-titrée ».</small>",false,false);}resolve();}
+        else if(d.type==='error')reject(new Error(d.message));
+      };
+      worker.postMessage({audio,model:$('model').value},[audio.buffer]);
+    });
+  }catch(err){
+    if(worker){worker.terminate();worker=null;}
+    const msg=String(err&&err.message);
+    setMsg(/fetch|network|Failed|load|import|worker|module/i.test(msg)?"Le modèle de reconnaissance n'a pas pu être téléchargé. Vérifie ta connexion internet puis appuie sur « Transcrire le fichier » pour réessayer.":'Erreur pendant la transcription : '+msg,true);
+  }finally{btn.disabled=false;transcribing=false;}
+};
+
+/* ---------- démarrage ---------- */
+if(autoBlocked){setMsg("Dans cette version en ligne, la transcription automatique ne peut pas télécharger son modèle. Pour l'utiliser, ouvre le fichier soustitreur.html sur ton ordinateur (Chrome ou Edge). Ici, utilise la saisie rapide : elle marche aussi sur téléphone.",true);$('go-auto').hidden=true;}
+if(!load()){
+  isSample=true;$('sample').hidden=false;
+  cues=[{s:0.4,e:3.4,t:'Bonjour à tous et bienvenue\ndans cette nouvelle vidéo.'},{s:3.6,e:7.2,t:"Aujourd'hui, on va voir comment\najouter des sous-titres animés."},{s:7.4,e:10.8,t:'Choisis un style, et ta vidéo\nest prête à publier.'}];
+}
+syncCtrls();renderPresets();fitStage();render();
+if(document.fonts&&document.fonts.load){Promise.all([document.fonts.load('900 40px Montserrat'),document.fonts.load('600 40px Montserrat')]).then(drawPreview).catch(()=>{});}
+requestAnimationFrame(loop);
+})();
+</script>
