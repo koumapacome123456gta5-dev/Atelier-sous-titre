@@ -24,6 +24,9 @@
 .status.err{border-left-color:var(--warn)}
 .status p{margin:0;font-weight:600;min-width:0;overflow-wrap:anywhere}
 .status small{display:block;font-weight:400;color:var(--muted)}
+details.sect>summary{cursor:pointer;font:700 13px var(--f-display);text-transform:uppercase;letter-spacing:.09em;color:var(--muted);list-style-position:outside}
+details.sect[open]>summary{margin-bottom:4px}
+.big{font-size:16px;padding:12px 18px}
 body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--f-body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
 .wrap{max-width:1240px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
 header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
@@ -107,7 +110,7 @@ select{font:500 14px var(--f-body);padding:7px 8px;border-radius:8px;border:1px 
     </div>
   </header>
 
-  <div class="status" id="status" hidden><p id="status-t"></p><div class="row" id="status-actions"><button id="go-auto" class="primary">Lancer la transcription</button><button id="go-manual">Écrire moi-même</button></div></div>
+  <div class="status" id="status" hidden><p id="status-t"></p><div class="row" id="status-actions"><button id="go-auto" class="primary">Lancer la transcription</button><button id="go-manual">Écrire moi-même</button><button id="go-rec" class="primary big" hidden>Télécharger la vidéo sous-titrée</button><button id="go-save" class="primary big" hidden>Enregistrer la vidéo</button><button id="go-file" hidden>Télécharger le fichier</button></div></div>
 
   <div class="grid">
     <section class="panel" aria-label="Lecteur et style">
@@ -187,18 +190,18 @@ select{font:500 14px var(--f-body);padding:7px 8px;border-radius:8px;border:1px 
       <div class="list" id="list"></div>
 
       <div class="sect">
-        <h2>Vidéo avec sous-titres incrustés</h2>
-        <p class="hint">Crée une vidéo prête à publier, avec le style choisi. L'enregistrement se fait en temps réel : une vidéo d'une minute prend une minute. Garde cet onglet ouvert pendant ce temps.</p>
+        <h2>Télécharger la vidéo</h2>
+        <p class="hint">Un seul bouton : la vidéo est fabriquée en haute qualité (jusqu'à 1080p, son d'origine) avec le style choisi, puis téléchargée directement. La fabrication prend la durée de la vidéo : garde l'écran allumé et reste sur la page.</p>
         <div class="row">
-          <button id="rec" class="primary">Créer la vidéo sous-titrée</button>
+          <button id="rec" class="primary big">Télécharger la vidéo sous-titrée</button>
           <button id="rec-stop" hidden>Annuler</button>
         </div>
         <div class="prog" id="recprog" hidden><i id="recprogi"></i></div>
         <p class="msg" id="recmsg"></p>
       </div>
 
-      <div class="sect">
-        <h2>Fichiers de sous-titres</h2>
+      <details class="sect">
+        <summary>Fichiers de sous-titres seuls (avancé)</summary>
         <div class="row">
           <button id="dl-srt">Télécharger .srt</button>
           <button id="dl-vtt">Télécharger .vtt</button>
@@ -206,7 +209,7 @@ select{font:500 14px var(--f-body);padding:7px 8px;border-radius:8px;border:1px 
           <button id="cp-txt" class="ghost">Copier le texte seul</button>
         </div>
         <textarea id="out" class="out" readonly aria-label="Aperçu SRT"></textarea>
-      </div>
+      </details>
     </section>
   </div>
 </div>
@@ -443,7 +446,7 @@ window.addEventListener('resize',drawPreview);
 
 /* ---------- lecteur ---------- */
 let triedData=false;
-function status(html,err,actions){$('status').hidden=false;$('status').classList.toggle('err',!!err);$('status-t').innerHTML=html;$('status-actions').hidden=!actions;}
+function status(html,err,actions){$('status').hidden=false;$('status').classList.toggle('err',!!err);$('status-t').innerHTML=html;let show=actions===true?['go-auto','go-manual']:Array.isArray(actions)?actions:[];if(inClaude)show=show.filter(x=>x!=='go-auto');['go-auto','go-manual','go-rec','go-save','go-file'].forEach(id=>$(id).hidden=!show.includes(id));$('status-actions').hidden=!show.length;}
 function esc(t){return String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 $('media-in').addEventListener('change',e=>{
   const f=e.target.files[0];e.target.value='';if(!f)return;mediaFile=f;triedData=false;
@@ -541,49 +544,66 @@ $('cp-txt').onclick=()=>copy(sorted().map(c=>c.t.replace(/\n/g,' ')).join('\n'),
 /* ---------- vidéo avec sous-titres incrustés ---------- */
 let actx=null,srcNode=null,speaker=null,recorder=null,recCancel=false;
 function ensureGraph(){if(!actx){actx=new (window.AudioContext||window.webkitAudioContext)();srcNode=actx.createMediaElementSource(video);speaker=actx.createGain();srcNode.connect(speaker);speaker.connect(actx.destination);}}
-function recMsg(t,err){const m=$('recmsg');m.textContent=t;m.className='msg'+(err?' err':'');}
-$('rec').onclick=async()=>{
+let recording=false,lastVideo=null;
+function recMsg(t,err){const m=$('recmsg');m.textContent=t;m.className='msg'+(err?' err':'');if(recording||err)status(esc(t),err,false);}
+$('go-rec').onclick=()=>$('rec').click();
+$('rec').onclick=()=>{
   if(!hasMedia())return recMsg("Ouvre d'abord une vidéo ou un son.",true);
-  if(!cues.length)return recMsg("Ajoute d'abord des sous-titres.",true);
-  if(!window.MediaRecorder)return recMsg("Ton navigateur ne sait pas enregistrer de vidéo. Essaie Chrome ou Edge.",true);
-  const mime=['video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm'].find(m=>MediaRecorder.isTypeSupported(m));
+  if(!cues.length)return recMsg("Il n'y a pas encore de sous-titres : lance d'abord la transcription.",true);
+  if(!window.MediaRecorder)return recMsg("Ce navigateur ne sait pas fabriquer de vidéo. Essaie Chrome, Edge ou Safari à jour.",true);
+  if(recording)return;
+  const mime=['video/mp4;codecs=avc1.640028,mp4a.40.2','video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm'].find(m=>MediaRecorder.isTypeSupported(m));
   if(!mime)return recMsg("Aucun format vidéo disponible dans ce navigateur.",true);
   let W,H;
-  if(isAudio){const [a,b]=st.ratio.split(':').map(Number);if(a>=b){W=1280;H=Math.round(1280*b/a);}else{H=1280;W=Math.round(1280*a/b);}}
+  if(isAudio){const [a,b]=st.ratio.split(':').map(Number);if(a>=b){W=1920;H=Math.round(1920*b/a);}else{H=1920;W=Math.round(1920*a/b);}}
   else{W=video.videoWidth;H=video.videoHeight;const sc=Math.min(1,1920/Math.max(W,H));W=Math.round(W*sc/2)*2;H=Math.round(H*sc/2)*2;}
-  const cv=document.createElement('canvas');cv.width=W;cv.height=H;const cx=cv.getContext('2d');
-  try{
-    ensureGraph();
-    await actx.resume();
-  }catch(e){return recMsg("Impossible de capter le son de ce fichier.",true);}
+  const cv=document.createElement('canvas');cv.width=W;cv.height=H;const cx=cv.getContext('2d',{alpha:false});
+  // Tout ce qui suit jusqu'à play() reste dans le geste de l'utilisateur (exigé par l'iPhone)
+  try{ensureGraph();actx.resume();}catch(e){return recMsg("Impossible de capter le son de ce fichier.",true);}
   const dest=actx.createMediaStreamDestination();srcNode.connect(dest);
+  const drawFrame=()=>{if(isAudio){cx.fillStyle=st.bg;cx.fillRect(0,0,W,H);}else{cx.drawImage(video,0,0,W,H);}drawCaptions(cx,W,H,video.currentTime);};
+  video.pause();video.currentTime=0;video.playbackRate=1;$('rate').value='1';drawFrame();
   const stream=cv.captureStream(30);dest.stream.getAudioTracks().forEach(tr=>stream.addTrack(tr));
-  const chunks=[];recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:6e6});
+  const vbr=Math.min(20e6,Math.max(8e6,Math.round(W*H*30*0.16)));
+  const chunks=[];
+  try{recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:vbr,audioBitsPerSecond:192000});}
+  catch(e){recorder=new MediaRecorder(stream,{mimeType:mime});}
   recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
-  recCancel=false;$('rec').disabled=true;$('rec-stop').hidden=false;$('recprog').hidden=false;
-  speaker.gain.value=0.25;
   const done=new Promise(res=>recorder.onstop=res);
-  video.pause();video.currentTime=0;video.playbackRate=1;$('rate').value='1';
-  await new Promise(r=>{video.addEventListener('seeked',r,{once:true});setTimeout(r,800);});
-  let raf;const frame=()=>{
-    if(isAudio){cx.fillStyle=st.bg;cx.fillRect(0,0,W,H);}else{cx.drawImage(video,0,0,W,H);}
-    drawCaptions(cx,W,H,video.currentTime);
-    $('recprogi').style.width=Math.round(video.currentTime/video.duration*100)+'%';
-    recMsg('Enregistrement… '+fmt(video.currentTime).slice(3,8)+' / '+fmt(video.duration).slice(3,8));
-    raf=requestAnimationFrame(frame);
-  };
-  frame();recorder.start(1000);
-  video.addEventListener('ended',()=>recorder.state!=='inactive'&&recorder.stop(),{once:true});
-  try{await video.play();}catch(e){recorder.stop();}
-  await done;cancelAnimationFrame(raf);
-  srcNode.disconnect(dest);speaker.gain.value=1;
-  $('rec').disabled=false;$('rec-stop').hidden=true;$('recprog').hidden=true;
-  if(recCancel){recMsg('Enregistrement annulé.');return;}
-  const ext=mime.includes('mp4')?'mp4':'webm';
-  const blob=new Blob(chunks,{type:mime.split(';')[0]});
-  recMsg('Vidéo prête ('+(blob.size/1e6).toFixed(1).replace('.',',')+' Mo, .'+ext+').');
-  await offer(mediaName+'-sous-titres.'+ext,blob);
+  recording=true;recCancel=false;$('rec').disabled=true;$('rec-stop').hidden=false;$('recprog').hidden=false;
+  speaker.gain.value=0.25;
+  recorder.start(1000);
+  const playP=video.play();
+  (async()=>{
+    let lock=null;try{lock=await navigator.wakeLock.request('screen');}catch(e){}
+    let raf;const frame=()=>{drawFrame();
+      $('recprogi').style.width=Math.round(video.currentTime/video.duration*100)+'%';
+      recMsg('Fabrication de la vidéo en HD… '+fmt(video.currentTime).slice(3,8)+' / '+fmt(video.duration).slice(3,8)+" (garde l'écran allumé)");
+      raf=requestAnimationFrame(frame);};
+    frame();
+    video.addEventListener('ended',()=>recorder.state!=='inactive'&&recorder.stop(),{once:true});
+    try{await playP;}catch(e){recCancel=true;recorder.stop();recording=false;recMsg("La lecture a été bloquée. Appuie à nouveau sur « Télécharger la vidéo sous-titrée ».",true);}
+    await done;cancelAnimationFrame(raf);
+    try{srcNode.disconnect(dest);}catch(e){}speaker.gain.value=1;try{lock&&lock.release();}catch(e){}
+    recording=false;$('rec').disabled=false;$('rec-stop').hidden=true;$('recprog').hidden=true;
+    if(recCancel){if(!$('status').classList.contains('err'))status('Fabrication annulée.',false,['go-rec']);return;}
+    const ext=mime.includes('mp4')?'mp4':'webm';
+    const blob=new Blob(chunks,{type:mime.split(';')[0]});
+    lastVideo={blob,name:mediaName+'-sous-titres.'+ext};
+    const size=(blob.size/1e6).toFixed(1).replace('.',',')+' Mo';
+    $('recmsg').textContent='Vidéo prête : '+W+'×'+H+', '+size+'.';$('recmsg').className='msg';
+    const file=new File([blob],lastVideo.name,{type:blob.type});
+    const canShare=!inClaude&&isMobile&&navigator.canShare&&navigator.canShare({files:[file]});
+    if(canShare){
+      status('✓ Ta vidéo sous-titrée est prête ('+W+'×'+H+', '+size+').<small>Appuie sur « Enregistrer la vidéo », puis choisis « Enregistrer la vidéo » pour la mettre dans ta galerie.</small>',false,['go-save','go-file']);
+    }else{
+      status('✓ Ta vidéo sous-titrée est prête ('+W+'×'+H+', '+size+').<small>Le téléchargement démarre. S\'il ne démarre pas, appuie sur « Télécharger le fichier ».</small>',false,['go-file']);
+      offer(lastVideo.name,blob);
+    }
+  })();
 };
+$('go-save').onclick=async()=>{if(!lastVideo)return;const file=new File([lastVideo.blob],lastVideo.name,{type:lastVideo.blob.type});try{await navigator.share({files:[file],title:lastVideo.name});}catch(e){if(e&&e.name!=='AbortError')offer(lastVideo.name,lastVideo.blob);}};
+$('go-file').onclick=()=>{if(lastVideo)offer(lastVideo.name,lastVideo.blob);};
 $('rec-stop').onclick=()=>{recCancel=true;video.pause();if(recorder&&recorder.state!=='inactive')recorder.stop();};
 
 /* ---------- transcription automatique (Whisper dans le navigateur) ---------- */
@@ -666,7 +686,7 @@ $('auto').onclick=async()=>{
       worker.onmessage=ev=>{const d=ev.data;
         if(d.type==='progress'&&d.p&&d.p.status==='progress'&&d.p.total){files[d.p.file]=[d.p.loaded,d.p.total];let l=0,t=0;for(const k in files){l+=files[k][0];t+=files[k][1];}$('progi').style.width=Math.round(l/t*100)+'%';setMsg('Téléchargement du modèle… '+Math.round(l/1e6)+' / '+Math.round(t/1e6)+' Mo');}
         else if(d.type==='status'){setMsg(d.text);if(d.text.startsWith('Transcription'))$('progi').style.width='100%';}
-        else if(d.type==='done'){const got=chunksToCues(d.out.chunks||[],video.duration,off);if(!got.length)setMsg('Aucune parole détectée dans ce fichier.',true);else{leaveSample(true);cues=got;save();render();setMsg(got.length+" sous-titres créés. Relis-les et corrige-les avant d'exporter.");transcribing=false;status("✓ "+got.length+" sous-titres créés automatiquement.<small>Regarde le résultat, choisis un style, puis appuie sur « Créer la vidéo sous-titrée ».</small>",false,false);}resolve();}
+        else if(d.type==='done'){const got=chunksToCues(d.out.chunks||[],video.duration,off);if(!got.length)setMsg('Aucune parole détectée dans ce fichier.',true);else{leaveSample(true);cues=got;save();render();setMsg(got.length+" sous-titres créés. Relis-les et corrige-les avant d'exporter.");transcribing=false;status("✓ "+got.length+" sous-titres créés automatiquement.<small>Choisis un style si tu veux, puis appuie sur « Télécharger la vidéo sous-titrée ».</small>",false,['go-rec']);}resolve();}
         else if(d.type==='error')reject(new Error(d.message));
       };
       worker.postMessage({audio,model:$('model').value,noGpu:isMobile},[audio.buffer]);
