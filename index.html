@@ -1,7 +1,7 @@
 <title>Atelier Sous-titres</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Montserrat:wght@600;800;900&family=Poppins:wght@900&family=Bangers&family=Luckiest+Guy&family=Righteous&family=Anton&family=Permanent+Marker&family=Pacifico&family=Lilita+One&family=Bebas+Neue&family=Bungee&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Montserrat:wght@600;800;900&display=swap">
 <style>
 /* Layout: régie de sous-titrage — écran, transport et styles à gauche ; la bande des sous-titres et l'export à droite ; une colonne sur téléphone */
 :root{
@@ -225,10 +225,20 @@ const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /* ---------- styles animés ---------- */
 const FONTS={
-  'Montserrat':{w:900,nm:'Montserrat (gras)'},'Poppins':{w:900,nm:'Poppins (rond)'},'Bangers':{w:400,nm:'Bangers (BD)'},
-  'Luckiest Guy':{w:400,nm:'Luckiest Guy (fun)'},'Righteous':{w:400,nm:'Righteous (rétro)'},'Anton':{w:400,nm:'Anton (géant)'},
-  'Bebas Neue':{w:400,nm:'Bebas Neue (cinéma)'},'Bungee':{w:400,nm:'Bungee (street)'},'Lilita One':{w:400,nm:'Lilita One (doux)'},
-  'Permanent Marker':{w:400,nm:'Permanent Marker (feutre)'},'Pacifico':{w:400,nm:'Pacifico (manuscrit)'},'IBM Plex Sans':{w:600,nm:'Plex Sans (sobre)'}
+  'Montserrat':{w:900,nm:'Montserrat',cat:'Gras et percutant'},'Poppins':{w:900,nm:'Poppins',cat:'Gras et percutant'},'Archivo Black':{w:400,nm:'Archivo Black',cat:'Gras et percutant'},
+  'Anton':{w:400,nm:'Anton (géant)',cat:'Gras et percutant'},'Oswald':{w:700,nm:'Oswald (étroit)',cat:'Gras et percutant'},'Bowlby One':{w:400,nm:'Bowlby One (très épais)',cat:'Gras et percutant'},
+  'Dela Gothic One':{w:400,nm:'Dela Gothic (bloc)',cat:'Gras et percutant'},'Passion One':{w:900,nm:'Passion One',cat:'Gras et percutant'},'Rubik Mono One':{w:400,nm:'Rubik Mono (carré)',cat:'Gras et percutant'},
+  'Bangers':{w:400,nm:'Bangers (BD)',cat:'Fun et animé'},'Luckiest Guy':{w:400,nm:'Luckiest Guy',cat:'Fun et animé'},'Titan One':{w:400,nm:'Titan One (bonbon)',cat:'Fun et animé'},
+  'Fredoka':{w:700,nm:'Fredoka (tout rond)',cat:'Fun et animé'},'Chewy':{w:400,nm:'Chewy (chewing-gum)',cat:'Fun et animé'},'Lilita One':{w:400,nm:'Lilita One',cat:'Fun et animé'},
+  'Knewave':{w:400,nm:'Knewave (pinceau)',cat:'Fun et animé'},'Creepster':{w:400,nm:'Creepster (horreur)',cat:'Fun et animé'},
+  'Bungee':{w:400,nm:'Bungee (street)',cat:'Street et sport'},'Sedgwick Ave Display':{w:400,nm:'Sedgwick (graffiti)',cat:'Street et sport'},'Black Ops One':{w:400,nm:'Black Ops (militaire)',cat:'Street et sport'},
+  'Racing Sans One':{w:400,nm:'Racing (course)',cat:'Street et sport'},'Russo One':{w:400,nm:'Russo One (sport)',cat:'Street et sport'},
+  'Orbitron':{w:900,nm:'Orbitron (futur)',cat:'Rétro et futuriste'},'Audiowide':{w:400,nm:'Audiowide (techno)',cat:'Rétro et futuriste'},'Righteous':{w:400,nm:'Righteous (rétro)',cat:'Rétro et futuriste'},
+  'Monoton':{w:400,nm:'Monoton (disco)',cat:'Rétro et futuriste'},'Press Start 2P':{w:400,nm:'Press Start (jeu vidéo)',cat:'Rétro et futuriste'},'Silkscreen':{w:400,nm:'Silkscreen (pixel)',cat:'Rétro et futuriste'},
+  'Shrikhand':{w:400,nm:'Shrikhand (années 70)',cat:'Rétro et futuriste'},
+  'Pacifico':{w:400,nm:'Pacifico',cat:'Manuscrit et élégant'},'Lobster':{w:400,nm:'Lobster',cat:'Manuscrit et élégant'},'Dancing Script':{w:700,nm:'Dancing Script',cat:'Manuscrit et élégant'},
+  'Permanent Marker':{w:400,nm:'Permanent Marker (feutre)',cat:'Manuscrit et élégant'},'Caveat Brush':{w:400,nm:'Caveat Brush (craie)',cat:'Manuscrit et élégant'},'Abril Fatface':{w:400,nm:'Abril Fatface (magazine)',cat:'Manuscrit et élégant'},
+  'Bebas Neue':{w:400,nm:'Bebas Neue (cinéma)',cat:'Sobre'},'IBM Plex Sans':{w:600,nm:'Plex Sans',cat:'Sobre'}
 };
 const PRESETS={
   impact:{nm:'Impact',font:'Montserrat',mode:'pop',words:3,size:8,upper:true,hl:'#ffd84a',anim:true},
@@ -245,6 +255,19 @@ const PRESETS={
   elegant:{nm:'Élégant',font:'Pacifico',mode:'soft',words:5,size:6.5,upper:false,hl:'#ffc2d6',anim:true},
   cinema:{nm:'Cinéma',font:'Bebas Neue',mode:'cine',words:0,size:7,upper:true,hl:'#ffffff',anim:false},
   mot:{nm:'Mot à mot',font:'Montserrat',mode:'pop',words:1,size:12,upper:true,hl:'#ff5a5a',anim:true},
+  pixel:{nm:'Jeu vidéo',font:'Press Start 2P',mode:'pop',words:2,size:5.5,upper:true,hl:'#4ade80',anim:true,stroke:.22},
+  futur:{nm:'Futur',font:'Orbitron',mode:'glow',words:3,size:6.5,upper:true,hl:'#22d3ee',anim:true},
+  disco:{nm:'Disco',font:'Monoton',mode:'glow',words:2,size:8,upper:true,hl:'#facc15',anim:true},
+  horreur:{nm:'Horreur',font:'Creepster',mode:'wobble',words:3,size:10,upper:true,hl:'#ef4444',anim:true,stroke:.14},
+  graffiti:{nm:'Graffiti',font:'Sedgwick Ave Display',mode:'shadow3d',words:3,size:10,upper:false,hl:'#f472b6',anim:true},
+  course:{nm:'Course',font:'Racing Sans One',mode:'bounce',words:3,size:9,upper:true,hl:'#f97316',anim:true},
+  bonbon:{nm:'Bonbon',font:'Chewy',mode:'bounce',words:4,size:9,upper:false,hl:'#f472b6',anim:true},
+  seventies:{nm:'Années 70',font:'Shrikhand',mode:'shadow3d',words:3,size:8,upper:false,hl:'#fb923c',anim:true},
+  militaire:{nm:'Commando',font:'Black Ops One',mode:'pop',words:3,size:8.5,upper:true,hl:'#a3e635',anim:true},
+  craie:{nm:'Craie',font:'Caveat Brush',mode:'reveal',words:6,size:9,upper:false,hl:'#fde68a',anim:false},
+  magazine:{nm:'Magazine',font:'Abril Fatface',mode:'box',words:3,size:8,upper:false,hl:'#ffffff',anim:true},
+  rond:{nm:'Tout rond',font:'Fredoka',mode:'color',words:4,size:8,upper:false,hl:'#60a5fa',anim:true},
+  bloc:{nm:'Bloc',font:'Dela Gothic One',mode:'gradient',words:2,size:9,upper:true,hl:'#a78bfa',anim:true},
   classique:{nm:'Classique',font:'IBM Plex Sans',mode:'classic',words:0,size:5,upper:false,hl:'#ffd84a',anim:false}
 };
 let st={preset:'impact',font:'Montserrat',words:3,size:8,upper:true,hl:'#ffd84a',anim:true,pos:'bas',ratio:'16:9',bg:'#141a2a'};
@@ -263,7 +286,9 @@ function renderPresets(){
     b.onclick=()=>{st.preset=k;Object.assign(st,{font:p.font,words:p.words,size:p.size,upper:p.upper,hl:p.hl,anim:p.anim});syncCtrls();saveStyle();renderPresets();drawPreview();};
     box.appendChild(b);}
 }
-$('st-font').innerHTML=Object.keys(FONTS).map(f=>'<option value="'+f+'">'+FONTS[f].nm+'</option>').join('');
+for(const f in FONTS){if(f==='Montserrat'||f==='IBM Plex Sans')continue;const l=document.createElement('link');l.rel='stylesheet';l.href='https://fonts.googleapis.com/css2?family='+f.replace(/ /g,'+')+(FONTS[f].w!==400?':wght@'+FONTS[f].w:'')+'&display=swap';const ff=f;l.onload=()=>{document.fonts&&document.fonts.load(FONTS[ff].w+' 40px "'+ff+'"').then(fontReady).catch(()=>{});};document.head.appendChild(l);}
+function fontReady(){clearTimeout(fontReady.t);fontReady.t=setTimeout(()=>{renderPresets();drawPreview();},250);}
+{const cats={};for(const f in FONTS)(cats[FONTS[f].cat]=cats[FONTS[f].cat]||[]).push(f);$('st-font').innerHTML=Object.keys(cats).map(c=>'<optgroup label="'+c+'">'+cats[c].map(f=>'<option value="'+f+'">'+FONTS[f].nm+'</option>').join('')+'</optgroup>').join('');}
 function syncCtrls(){$('st-font').value=st.font;$('st-words').value=st.words;$('st-pos').value=st.pos;$('st-size').value=st.size;$('st-hl').value=st.hl;$('st-upper').checked=st.upper;$('st-anim').checked=st.anim;$('st-ratio').value=st.ratio;$('st-bg').value=st.bg;}
 [['st-font','font',v=>v],['st-words','words',v=>+v],['st-pos','pos',v=>v],['st-size','size',v=>+v],['st-hl','hl',v=>v],['st-ratio','ratio',v=>v],['st-bg','bg',v=>v]].forEach(([id,k,f])=>$(id).addEventListener('input',e=>{st[k]=f(e.target.value);saveStyle();if(k==='ratio')fitStage();drawPreview();}));
 $('st-upper').onchange=e=>{st.upper=e.target.checked;saveStyle();drawPreview();};
