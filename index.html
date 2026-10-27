@@ -580,8 +580,10 @@ async function exportOffline(W,H,cv,draw,onProgress){
   // Son : encodé directement depuis le fichier, par blocs d'une seconde
   if(acfg){
     const aenc=new AudioEncoder({output:(c,m)=>muxer.addAudioChunk(c,m),error:e=>failure=e});aenc.configure(acfg);
-    const ch=acfg.numberOfChannels,sr=ab.sampleRate,len=ab.length,chans=[];
-    for(let c=0;c<ch;c++)chans.push(ab.getChannelData(Math.min(c,ab.numberOfChannels-1)));
+    const ch=acfg.numberOfChannels,sr=ab.sampleRate,chans=[];
+    // Compense le délai d'amorçage de l'encodeur (AAC : 2112 échantillons, Opus : 312) pour caler la voix à l'image près
+    const skip=Math.min(ab.length-1,Math.round((akind==='aac'?2112:312)*sr/48000)),len=ab.length-skip;
+    for(let c=0;c<ch;c++)chans.push(ab.getChannelData(Math.min(c,ab.numberOfChannels-1)).subarray(skip));
     for(let off=0;off<len;off+=sr){const n=Math.min(sr,len-off),buf=new Float32Array(n*ch);for(let c=0;c<ch;c++)buf.set(chans[c].subarray(off,off+n),c*n);
       const ad=new AudioData({format:'f32-planar',sampleRate:sr,numberOfFrames:n,numberOfChannels:ch,timestamp:Math.round(off/sr*1e6),data:buf});aenc.encode(ad);ad.close();}
     await aenc.flush();aenc.close();
