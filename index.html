@@ -111,7 +111,7 @@ select{font:500 14px var(--f-body);padding:7px 8px;border-radius:8px;border:1px 
     </div>
   </header>
 
-  <div class="status" id="status" hidden><p id="status-t"></p><div class="row" id="status-actions"><button id="go-auto" class="primary">Transcrire automatiquement</button><button id="go-manual">Écrire moi-même</button></div></div>
+  <div class="status" id="status" hidden><p id="status-t"></p><div class="row" id="status-actions"><button id="go-auto" class="primary">Lancer la transcription</button><button id="go-manual">Écrire moi-même</button></div></div>
 
   <div class="grid">
     <section class="panel" aria-label="Lecteur et style">
@@ -168,7 +168,7 @@ select{font:500 14px var(--f-body);padding:7px 8px;border-radius:8px;border:1px 
         <h2 id="auto-h">Transcription automatique</h2>
         <p class="hint">Whisper reconnaît la parole en français et crée les sous-titres horodatés, directement dans ton navigateur. Le modèle se télécharge une seule fois (environ 80 Mo pour Rapide, 250 Mo pour Précis). Fonctionne mieux sur ordinateur, dans Chrome ou Edge.</p>
         <div class="row">
-          <select id="model" aria-label="Modèle"><option value="onnx-community/whisper-base">Rapide (base)</option><option value="onnx-community/whisper-small">Précis (small)</option></select>
+          <select id="model" aria-label="Modèle"><option value="onnx-community/whisper-tiny">Léger (téléphone, 40 Mo)</option><option value="onnx-community/whisper-base" selected>Rapide (base, 85 Mo)</option><option value="onnx-community/whisper-small">Précis (small, ordinateur)</option></select>
           <button id="auto" class="primary" disabled>Transcrire le fichier</button>
         </div>
         <div class="prog" id="prog" hidden><i id="progi"></i></div>
@@ -221,6 +221,8 @@ const $=id=>document.getElementById(id);
 const video=$('video'), stage=$('stage'), cap=$('cap'), bar=$('bar'), list=$('list');
 let cues=[], mediaName='sous-titres', markStart=null, isSample=false, mediaFile=null, isAudio=false;
 const inClaude=!!(window.claude&&window.claude.use)||/claudeusercontent|claude\.ai/.test(location.hostname);
+const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const BUSY='atelier-sous-titres-busy';
 const KEY='atelier-sous-titres-v1', SKEY='atelier-sous-titres-style-v1';
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -406,9 +408,9 @@ function mediaError(){
 video.addEventListener('loadedmetadata',()=>{
   $('dur').textContent=fmt(video.duration);fitStage();drawBar();
   status('✓ '+esc(mediaFile?mediaFile.name:'Fichier')+' est chargé ('+fmt(video.duration).slice(3,8)+').'+(autoBlocked?'<small>Dans ce lien Claude, la transcription automatique est impossible : utilise le fichier soustitreur.html pour le mode automatique, ou écris les sous-titres ici.</small>':'<small>La transcription automatique démarre…</small>'),false,autoBlocked);
-  if(!autoBlocked&&mediaFile&&!transcribing){$('auto').disabled=false;$('auto').click();}
+  if(!autoBlocked&&mediaFile&&!transcribing){$('auto').disabled=false;if(isMobile){status('✓ '+esc(mediaFile.name)+' est chargé ('+fmt(video.duration).slice(3,8)+').<small>Appuie sur « Lancer la transcription ». Garde l\'écran allumé et l\'application ouverte jusqu\'à la fin.</small>',false,true);}else{$('auto').click();}}
 });
-$('go-auto').onclick=()=>{$('auto-h').scrollIntoView({behavior:reduce?'auto':'smooth',block:'start'});if(!autoBlocked)$('auto').click();};
+$('go-auto').onclick=()=>{if(!autoBlocked)$('auto').click();};
 $('go-manual').onclick=()=>{$('quick').scrollIntoView({behavior:reduce?'auto':'smooth',block:'center'});$('quick').focus({preventScroll:true});};
 video.addEventListener('play',()=>$('play').textContent='Pause');
 video.addEventListener('pause',()=>$('play').textContent='Lecture');
@@ -475,6 +477,7 @@ $('cp-txt').onclick=()=>copy(sorted().map(c=>c.t.replace(/\n/g,' ')).join('\n'),
 
 /* ---------- vidéo avec sous-titres incrustés ---------- */
 let actx=null,srcNode=null,speaker=null,recorder=null,recCancel=false;
+function ensureGraph(){if(!actx){actx=new (window.AudioContext||window.webkitAudioContext)();srcNode=actx.createMediaElementSource(video);speaker=actx.createGain();srcNode.connect(speaker);speaker.connect(actx.destination);}}
 function recMsg(t,err){const m=$('recmsg');m.textContent=t;m.className='msg'+(err?' err':'');}
 $('rec').onclick=async()=>{
   if(!hasMedia())return recMsg("Ouvre d'abord une vidéo ou un son.",true);
@@ -487,7 +490,7 @@ $('rec').onclick=async()=>{
   else{W=video.videoWidth;H=video.videoHeight;const sc=Math.min(1,1920/Math.max(W,H));W=Math.round(W*sc/2)*2;H=Math.round(H*sc/2)*2;}
   const cv=document.createElement('canvas');cv.width=W;cv.height=H;const cx=cv.getContext('2d');
   try{
-    if(!actx){actx=new (window.AudioContext||window.webkitAudioContext)();srcNode=actx.createMediaElementSource(video);speaker=actx.createGain();srcNode.connect(speaker);speaker.connect(actx.destination);}
+    ensureGraph();
     await actx.resume();
   }catch(e){return recMsg("Impossible de capter le son de ce fichier.",true);}
   const dest=actx.createMediaStreamDestination();srcNode.connect(dest);
@@ -525,16 +528,16 @@ const workerCode=`
 import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.1';
 env.allowLocalModels=false;
 let asr=null,cur='';
-async function build(model){
+async function build(model,noGpu){
   const progress_callback=p=>self.postMessage({type:'progress',p});
-  let gpu=false;try{if(navigator.gpu){gpu=!!(await navigator.gpu.requestAdapter());}}catch(e){}
+  let gpu=false;try{if(!noGpu&&navigator.gpu){gpu=!!(await navigator.gpu.requestAdapter());}}catch(e){}
   if(gpu){try{return await pipeline('automatic-speech-recognition',model,{device:'webgpu',dtype:{encoder_model:'fp32',decoder_model_merged:'q4'},progress_callback});}catch(e){}}
   return await pipeline('automatic-speech-recognition',model,{device:'wasm',dtype:'q8',progress_callback});
 }
 self.onmessage=async e=>{
-  const {audio,model}=e.data;
+  const {audio,model,noGpu}=e.data;
   try{
-    if(!asr||cur!==model){self.postMessage({type:'status',text:'Téléchargement du modèle…'});asr=await build(model);cur=model;}
+    if(!asr||cur!==model){self.postMessage({type:'status',text:'Téléchargement du modèle…'});asr=null;asr=await build(model,noGpu);cur=model;}
     self.postMessage({type:'status',text:'Transcription en cours… (peut prendre plusieurs minutes)'});
     const out=await asr(audio,{language:'french',task:'transcribe',return_timestamps:true,chunk_length_s:30,stride_length_s:5});
     self.postMessage({type:'done',out});
@@ -552,9 +555,26 @@ async function decode(file){
   if(ab.numberOfChannels===1)return ab.getChannelData(0);
   const a=ab.getChannelData(0),b=ab.getChannelData(1),m=new Float32Array(a.length);for(let i=0;i<a.length;i++)m[i]=(a[i]+b[i])/2;return m;
 }
-function chunksToCues(chunks,dur){
+/* Sur téléphone : on écoute la vidéo en silence au lieu de la charger d'un bloc (évite le manque de mémoire) */
+async function captureAudio(playP){
+  const sr=actx.sampleRate,ratio=sr/16000,dur=video.duration||600;
+  const out=new Float32Array(Math.ceil(dur*16000)+32000);let idx=0,acc=0,cnt=0,pos=0,offset=null;
+  const sp=actx.createScriptProcessor(4096,2,1),z=actx.createGain();z.gain.value=0;
+  sp.onaudioprocess=e=>{if(video.paused)return;if(offset===null)offset=Math.max(0,video.currentTime-e.inputBuffer.duration);const ib=e.inputBuffer,a=ib.getChannelData(0),b=ib.numberOfChannels>1?ib.getChannelData(1):a;
+    for(let i=0;i<a.length;i++){acc+=(a[i]+b[i])*0.5;cnt++;pos+=1;if(pos>=ratio){if(idx<out.length)out[idx++]=acc/cnt;acc=0;cnt=0;pos-=ratio;}}};
+  srcNode.connect(sp);sp.connect(z);z.connect(actx.destination);speaker.gain.value=0;
+  let lock=null;try{lock=await navigator.wakeLock.request('screen');}catch(e){}
+  const tick=setInterval(()=>{setMsg("Écoute de la vidéo en silence… "+fmt(video.currentTime).slice(3,8)+' / '+fmt(dur).slice(3,8)+" (garde l'écran allumé)");$('progi').style.width=Math.round(video.currentTime/dur*100)+'%';if(video.paused&&!video.ended&&document.visibilityState==='visible')video.play().catch(()=>{});},500);
+  try{
+    await playP;
+    await new Promise(res=>video.addEventListener('ended',res,{once:true}));
+  }finally{clearInterval(tick);try{srcNode.disconnect(sp);sp.disconnect();}catch(e){}speaker.gain.value=1;try{lock&&lock.release();}catch(e){}}
+  return {audio:out.slice(0,idx),offset:offset||0};
+}
+function chunksToCues(chunks,dur,off){
+  off=off||0;
   const out=[];
-  for(const ch of chunks){let [s,e]=ch.timestamp;const t=(ch.text||'').trim();if(!t)continue;if(e==null)e=Math.min(dur||s+4,s+6);if(e<=s)e=s+1;
+  for(const ch of chunks){let [s,e]=ch.timestamp;s+=off;if(e!=null)e+=off;const t=(ch.text||'').trim();if(!t)continue;if(e==null)e=Math.min(dur||s+4,s+6);if(e<=s)e=s+1;
     if(t.length<=84){out.push({s,e,t:wrapLines(t)});continue;}
     const words=t.split(/\s+/),n=Math.ceil(t.length/80),per=Math.ceil(words.length/n),span=(e-s)/n;
     for(let k=0;k<n;k++){const w=words.slice(k*per,(k+1)*per).join(' ');if(w)out.push({s:s+k*span,e:s+(k+1)*span,t:wrapLines(w)});}
@@ -563,10 +583,19 @@ function chunksToCues(chunks,dur){
 }
 $('auto').onclick=async()=>{
   if(!mediaFile)return setMsg("Ouvre d'abord un fichier.",true);
-  const btn=$('auto');btn.disabled=true;transcribing=true;$('prog').hidden=false;$('progi').style.width='0%';
+  const btn=$('auto');
+  // Sur téléphone, la lecture doit démarrer tout de suite, dans le geste de l'utilisateur
+  let playP=null;
+  if(isMobile){try{ensureGraph();actx.resume();video.pause();video.currentTime=0;video.playbackRate=1;$('rate').value='1';playP=video.play();}catch(e){}}
+  btn.disabled=true;transcribing=true;$('prog').hidden=false;$('progi').style.width='0%';
+  try{localStorage.setItem(BUSY,JSON.stringify({model:$('model').value,name:mediaFile.name}));}catch(e){}
+  let off=0;
   try{
     setMsg('Lecture du son…');
-    const audio=await decode(mediaFile);
+    let audio;
+    if(playP){const r=await captureAudio(playP);audio=r.audio;off=r.offset;if(audio.length<16000)throw new Error('son vide');}
+    else audio=await decode(mediaFile);
+    $('progi').style.width='0%';
     if(!worker)worker=new Worker(URL.createObjectURL(new Blob([workerCode],{type:'text/javascript'})),{type:'module'});
     const files={};
     await new Promise((resolve,reject)=>{
@@ -574,19 +603,22 @@ $('auto').onclick=async()=>{
       worker.onmessage=ev=>{const d=ev.data;
         if(d.type==='progress'&&d.p&&d.p.status==='progress'&&d.p.total){files[d.p.file]=[d.p.loaded,d.p.total];let l=0,t=0;for(const k in files){l+=files[k][0];t+=files[k][1];}$('progi').style.width=Math.round(l/t*100)+'%';setMsg('Téléchargement du modèle… '+Math.round(l/1e6)+' / '+Math.round(t/1e6)+' Mo');}
         else if(d.type==='status'){setMsg(d.text);if(d.text.startsWith('Transcription'))$('progi').style.width='100%';}
-        else if(d.type==='done'){const got=chunksToCues(d.out.chunks||[],video.duration);if(!got.length)setMsg('Aucune parole détectée dans ce fichier.',true);else{leaveSample(true);cues=got;save();render();setMsg(got.length+" sous-titres créés. Relis-les et corrige-les avant d'exporter.");transcribing=false;status("✓ "+got.length+" sous-titres créés automatiquement.<small>Regarde le résultat, choisis un style, puis appuie sur « Créer la vidéo sous-titrée ».</small>",false,false);}resolve();}
+        else if(d.type==='done'){const got=chunksToCues(d.out.chunks||[],video.duration,off);if(!got.length)setMsg('Aucune parole détectée dans ce fichier.',true);else{leaveSample(true);cues=got;save();render();setMsg(got.length+" sous-titres créés. Relis-les et corrige-les avant d'exporter.");transcribing=false;status("✓ "+got.length+" sous-titres créés automatiquement.<small>Regarde le résultat, choisis un style, puis appuie sur « Créer la vidéo sous-titrée ».</small>",false,false);}resolve();}
         else if(d.type==='error')reject(new Error(d.message));
       };
-      worker.postMessage({audio,model:$('model').value},[audio.buffer]);
+      worker.postMessage({audio,model:$('model').value,noGpu:isMobile},[audio.buffer]);
     });
   }catch(err){
     if(worker){worker.terminate();worker=null;}
     const msg=String(err&&err.message);
-    setMsg(/fetch|network|Failed|load|import|worker|module/i.test(msg)?"Le modèle de reconnaissance n'a pas pu être téléchargé. Vérifie ta connexion internet puis appuie sur « Transcrire le fichier » pour réessayer.":'Erreur pendant la transcription : '+msg,true);
-  }finally{btn.disabled=false;transcribing=false;}
+    setMsg(msg==='son vide'?"Le son de la vidéo n'a pas pu être écouté. Appuie sur « Lancer la transcription » pour réessayer, sans quitter l'application.":/play|NotAllowed/i.test(msg)?"La lecture a été bloquée par le téléphone. Appuie à nouveau sur « Lancer la transcription ».":/fetch|network|Failed|load|import|worker|module/i.test(msg)?"Le modèle de reconnaissance n'a pas pu être téléchargé. Vérifie ta connexion internet puis relance la transcription.":'Erreur pendant la transcription : '+msg,true);
+  }finally{btn.disabled=false;transcribing=false;try{localStorage.removeItem(BUSY);}catch(e){}if(isMobile&&worker){worker.terminate();worker=null;}if($('status-actions')&&mediaFile&&!cues.length){$('status-actions').hidden=false;}}
 };
 
 /* ---------- démarrage ---------- */
+try{const b=JSON.parse(localStorage.getItem(BUSY)||'null');if(b){localStorage.removeItem(BUSY);
+  if(!autoBlocked){$('model').value='onnx-community/whisper-tiny';}
+  setTimeout(()=>status("La page s'est rechargée pendant la transcription de « "+esc(b.name||'ta vidéo')+" ».<small>Ton appareil a sans doute manqué de mémoire. J'ai choisi le modèle Léger : rouvre la vidéo et relance. Si ça recommence, essaie une vidéo plus courte (moins de 2 minutes) ou passe par un ordinateur.</small>",true,false),0);}}catch(e){}
 if(autoBlocked){setMsg("Dans cette version en ligne, la transcription automatique ne peut pas télécharger son modèle. Pour l'utiliser, ouvre le fichier soustitreur.html sur ton ordinateur (Chrome ou Edge). Ici, utilise la saisie rapide : elle marche aussi sur téléphone.",true);$('go-auto').hidden=true;}
 if(!load()){
   isSample=true;$('sample').hidden=false;
