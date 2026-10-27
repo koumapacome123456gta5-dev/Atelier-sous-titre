@@ -102,11 +102,10 @@ select{font:500 14px var(--f-body);padding:7px 8px;border-radius:8px;border:1px 
   <header>
     <div>
       <h1>Atelier <span>Sous-titres</span></h1>
-      <div class="tag">SOUS-TITRES ANIMÉS · SRT · VTT · VIDÉO INCRUSTÉE</div>
+      <div class="tag">TRANSCRIPTION AUTOMATIQUE · STYLES ANIMÉS · VIDÉO HD</div>
     </div>
     <div class="row">
-      <label class="btn filebtn primary">Choisir une vidéo à sous-titrer<input id="media-in" type="file" accept="video/*,audio/*"></label>
-      <label class="btn filebtn">Importer .srt / .vtt<input id="subs-in" type="file" accept=".srt,.vtt,.txt,text/plain"></label>
+      <label class="btn filebtn primary big">Choisir une vidéo à sous-titrer<input id="media-in" type="file" accept="video/*,audio/*"></label>
     </div>
   </header>
 
@@ -153,8 +152,8 @@ select{font:500 14px var(--f-body);padding:7px 8px;border-radius:8px;border:1px 
         </div>
       </div>
 
-      <div class="sect">
-        <h2>Saisie rapide</h2>
+      <details class="sect" id="manual">
+        <summary>Écrire ou corriger à la main</summary>
         <div class="row">
           <button id="mark" title="Marquer le début (Alt+D)">Marquer le début</button>
           <span class="tc" id="markv" style="color:var(--muted);font-size:13px">début : après le dernier sous-titre</span>
@@ -162,11 +161,11 @@ select{font:500 14px var(--f-body);padding:7px 8px;border-radius:8px;border:1px 
         <textarea id="quick" placeholder="Tape ce que tu entends, puis Entrée à la fin de la phrase…"></textarea>
         <div class="row"><button id="add" class="primary">Ajouter le sous-titre (Entrée)</button></div>
         <p class="hint">Lance la lecture, écris la phrase, appuie sur <kbd>Entrée</kbd> quand elle se termine : le sous-titre va du début marqué (ou de la fin du précédent) jusqu'à maintenant. <kbd>Échap</kbd> met en pause ou relance, <kbd>Maj</kbd>+<kbd>Entrée</kbd> passe à la ligne.</p>
-      </div>
+      </details>
 
       <div class="sect">
         <h2 id="auto-h">Transcription automatique</h2>
-        <p class="hint">Whisper reconnaît la parole en français et crée les sous-titres horodatés, directement dans ton navigateur. Le modèle se télécharge une seule fois (environ 80 Mo pour Rapide, 250 Mo pour Précis). Fonctionne mieux sur ordinateur, dans Chrome ou Edge.</p>
+        <p class="hint">Whisper reconnaît la parole en français et crée les sous-titres horodatés, directement dans ton navigateur. Le modèle se télécharge une seule fois (40 Mo pour Léger, 85 Mo pour Rapide, 250 Mo pour Précis), puis reste en mémoire.</p>
         <div class="row">
           <select id="model" aria-label="Modèle"><option value="onnx-community/whisper-tiny">Léger (téléphone, 40 Mo)</option><option value="onnx-community/whisper-base" selected>Rapide (base, 85 Mo)</option><option value="onnx-community/whisper-small">Précis (small, ordinateur)</option></select>
           <button id="auto" class="primary" disabled>Transcrire le fichier</button>
@@ -203,6 +202,7 @@ select{font:500 14px var(--f-body);padding:7px 8px;border-radius:8px;border:1px 
       <details class="sect">
         <summary>Fichiers de sous-titres seuls (avancé)</summary>
         <div class="row">
+          <label class="btn filebtn">Importer .srt / .vtt<input id="subs-in" type="file" accept=".srt,.vtt,.txt,text/plain"></label>
           <button id="dl-srt">Télécharger .srt</button>
           <button id="dl-vtt">Télécharger .vtt</button>
           <button id="cp-srt" class="ghost">Copier le SRT</button>
@@ -219,7 +219,8 @@ select{font:500 14px var(--f-body);padding:7px 8px;border-radius:8px;border:1px 
 (function(){
 const $=id=>document.getElementById(id);
 const video=$('video'), stage=$('stage'), cap=$('cap'), bar=$('bar'), list=$('list');
-let cues=[], mediaName='sous-titres', markStart=null, isSample=false, mediaFile=null, isAudio=false;
+let cues=[], mediaName='sous-titres', markStart=null, isSample=false, mediaFile=null, isAudio=false, lastActive=-2;
+let transcribing=false, recording=false;
 const inClaude=!!(window.claude&&window.claude.use)||/claudeusercontent|claude\.ai/.test(location.hostname);
 const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 const BUSY='atelier-sous-titres-busy';
@@ -319,7 +320,7 @@ function render(){
   cues=sorted();const cs=cues;
   $('count').textContent=cs.length?'· '+cs.length:'';
   list.innerHTML='';
-  if(!cs.length){const p=document.createElement('p');p.className='msg';p.textContent="Aucun sous-titre pour l'instant. Utilise la saisie rapide, la transcription automatique ou importe un fichier .srt.";list.appendChild(p);}
+  if(!cs.length){const p=document.createElement('p');p.className='msg';p.textContent="Aucun sous-titre pour l'instant. Choisis une vidéo : les sous-titres apparaîtront ici après la transcription automatique.";list.appendChild(p);}
   cs.forEach((c,i)=>{
     const el=document.createElement('div');el.className='item';el.dataset.i=i;
     const dur=c.e-c.s, cps=dur>0?c.t.replace(/\s/g,'').length/dur:0;
@@ -403,7 +404,7 @@ function renderPage(ctx,W,H,pg,t,S){
         case 'reveal':if(on){fill=S.hl;const q=reduce?1:Math.min(1,(t-wd.s)/0.12);const sc=0.6+0.4*(1-Math.pow(1-q,3));ctx.translate(cx,cy);ctx.scale(sc,sc);ctx.translate(-cx,-cy);}break;
         case 'glow':stroke=false;fill=on?'#ffffff':S.hl;ctx.shadowColor=S.hl;ctx.shadowBlur=on?fs*0.9:fs*0.4;ctx.fillStyle=fill;ctx.fillText(o.w,x,y);break;
         case 'shadow3d':{stroke=false;const d=Math.max(2,fs*0.07);ctx.fillStyle='#111111';for(let i=d;i>0;i-=1)ctx.fillText(o.w,x+i,y+i);fill=on?S.hl:'#ffffff';if(on){ctx.translate(-d*0.4,-d*0.4);}break;}
-        case 'underline':{stroke=false;if(on||pg.active>o.i){ctx.save();ctx.fillStyle=S.hl;ctx.globalAlpha=0.9;const w=o.ww*(on&&!reduce?Math.min(1,prog*1.6):1);ctx.translate(x,y-fs*0.55);ctx.rotate(-0.02);roundBox(ctx,-fs*0.08,0,w+fs*0.16,fs*0.62,fs*0.12);ctx.restore();}fill=(on||pg.active>o.i)?'#141414':'#ffffff';if(fill==='#ffffff'){ctx.shadowColor='rgba(0,0,0,.85)';ctx.shadowBlur=fs*0.2;}break;}
+        case 'underline':{if(on||pg.active>o.i){ctx.save();ctx.fillStyle=S.hl;ctx.globalAlpha=0.85;const w=o.ww*(on&&!reduce?Math.min(1,prog*1.6):1);ctx.translate(x,y-fs*0.38);ctx.rotate(-0.02);roundBox(ctx,-fs*0.06,0,w+fs*0.12,fs*0.42,fs*0.1);ctx.restore();}ctx.lineWidth=fs*0.1;ctx.strokeStyle='#000000';ctx.strokeText(o.w,x,y);stroke=false;break;}
         case 'soft':stroke=false;if(on)fill=S.hl;ctx.shadowColor='rgba(0,0,0,.75)';ctx.shadowBlur=fs*0.3;ctx.shadowOffsetY=fs*0.06;break;
         case 'cine':stroke=false;ctx.shadowColor='rgba(0,0,0,.9)';ctx.shadowBlur=fs*0.25;ctx.shadowOffsetY=fs*0.05;break;
         case 'box':stroke=false;if(on){ctx.fillStyle=S.hl;const px=fs*0.18;roundBox(ctx,x-px,y-fs*0.9,o.ww+px*2,fs*1.15,fs*0.18);fill='#111111';}else{ctx.shadowColor='rgba(0,0,0,.85)';ctx.shadowBlur=fs*0.25;ctx.shadowOffsetY=fs*0.05;}break;
@@ -428,12 +429,15 @@ function drawPreview(){
   if(idx!==lastActive){lastActive=idx;list.querySelectorAll('.item').forEach(el=>el.classList.toggle('on',+el.dataset.i===idx));bar.querySelectorAll('.cue').forEach((el,i)=>el.classList.toggle('on',i===idx));
     if(idx>=0&&hasMedia()&&!video.paused&&!document.activeElement.closest('.item')){const el=list.querySelector('.item[data-i="'+idx+'"]');el&&el.scrollIntoView({block:'nearest'});}}
 }
-let lastActive=-2;
 function loop(){
-  if(!hasMedia()&&isSample){demoT=((performance.now()-demoStart)/1000)%11;$('cur').textContent=fmt(demoT);}
-  if(hasMedia()){$('cur').textContent=fmt(video.currentTime);}
-  moveHead();drawPreview();requestAnimationFrame(loop);
+  // On ne redessine que si quelque chose bouge (économise la batterie)
+  const demo=!hasMedia()&&isSample,playing=hasMedia()&&!video.paused;
+  if(demo){demoT=((performance.now()-demoStart)/1000)%11;$('cur').textContent=fmt(demoT);}
+  if(playing)$('cur').textContent=fmt(video.currentTime);
+  if(demo||playing){moveHead();drawPreview();}
+  requestAnimationFrame(loop);
 }
+video.addEventListener('seeked',()=>{$('cur').textContent=fmt(video.currentTime);moveHead();drawPreview();});
 function fitStage(){
   let ratio=16/9;
   if(hasMedia()&&!isAudio&&video.videoWidth)ratio=video.videoWidth/video.videoHeight;
@@ -449,13 +453,15 @@ let triedData=false;
 function status(html,err,actions){$('status').hidden=false;$('status').classList.toggle('err',!!err);$('status-t').innerHTML=html;let show=actions===true?['go-auto','go-manual']:Array.isArray(actions)?actions:[];if(inClaude)show=show.filter(x=>x!=='go-auto');['go-auto','go-manual','go-rec','go-save','go-file'].forEach(id=>$(id).hidden=!show.includes(id));$('status-actions').hidden=!show.length;}
 function esc(t){return String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 $('media-in').addEventListener('change',e=>{
-  const f=e.target.files[0];e.target.value='';if(!f)return;mediaFile=f;triedData=false;
+  const f=e.target.files[0];e.target.value='';if(!f)return;
+  if(transcribing||recording){toast('Attends la fin du travail en cours avant de changer de vidéo');return;}
+  mediaFile=f;triedData=false;lastVideo=null;
   if(video.src&&video.src.startsWith('blob:'))URL.revokeObjectURL(video.src);
   isAudio=f.type.startsWith('audio')||/\.(mp3|wav|m4a|aac|ogg|flac|opus|amr)$/i.test(f.name);
   video.hidden=isAudio;$('empty').hidden=true;
   $('audioface').hidden=!isAudio;$('audioface').textContent=isAudio?'♪ '+f.name:'';
   mediaName=f.name.replace(/\.[^.]+$/,'')||'sous-titres';
-  leaveSample(true);markStart=null;
+  leaveSample(true);cues=[];markStart=null;
   status('Chargement de '+esc(f.name)+'…<small>'+(f.size/1e6).toFixed(1).replace('.',',')+' Mo</small>',false,false);
   video.src=URL.createObjectURL(f);video.load();
   fitStage();save();render();
@@ -473,11 +479,15 @@ function mediaError(){
 }
 video.addEventListener('loadedmetadata',()=>{
   $('dur').textContent=fmt(video.duration);fitStage();drawBar();
-  status('✓ '+esc(mediaFile?mediaFile.name:'Fichier')+' est chargé ('+fmt(video.duration).slice(3,8)+').'+(autoBlocked?'<small>Dans ce lien Claude, la transcription automatique est impossible : utilise le fichier soustitreur.html pour le mode automatique, ou écris les sous-titres ici.</small>':'<small>La transcription automatique démarre…</small>'),false,autoBlocked);
-  if(!autoBlocked&&mediaFile&&!transcribing){$('auto').disabled=false;if(isMobile){status('✓ '+esc(mediaFile.name)+' est chargé ('+fmt(video.duration).slice(3,8)+').<small>Appuie sur « Lancer la transcription ». Garde l\'écran allumé et l\'application ouverte jusqu\'à la fin.</small>',false,true);}else{$('auto').click();}}
+  if(!mediaFile||transcribing||recording)return;
+  const head='✓ '+esc(mediaFile.name)+' est chargé ('+fmt(video.duration).slice(3,8)+').';
+  if(autoBlocked){status(head+'<small>Dans cet aperçu Claude, la transcription automatique est bloquée. Utilise le site de l\'application pour le mode automatique.</small>',false,['go-manual']);return;}
+  $('auto').disabled=false;
+  if(useCapture()){status(head+'<small>Appuie sur « Lancer la transcription ». Garde l\'écran allumé et reste sur la page jusqu\'à la fin.</small>',false,true);}
+  else{status(head+'<small>La transcription automatique démarre…</small>',false,false);$('auto').click();}
 });
 $('go-auto').onclick=()=>{if(!autoBlocked)$('auto').click();};
-$('go-manual').onclick=()=>{$('quick').scrollIntoView({behavior:reduce?'auto':'smooth',block:'center'});$('quick').focus({preventScroll:true});};
+$('go-manual').onclick=()=>{$('manual').open=true;$('quick').scrollIntoView({behavior:reduce?'auto':'smooth',block:'center'});$('quick').focus({preventScroll:true});};
 video.addEventListener('play',()=>$('play').textContent='Pause');
 video.addEventListener('pause',()=>$('play').textContent='Lecture');
 function toggle(){if(!hasMedia())return toast("Ouvre d'abord un fichier");video.paused?video.play():video.pause();}
@@ -544,7 +554,7 @@ $('cp-txt').onclick=()=>copy(sorted().map(c=>c.t.replace(/\n/g,' ')).join('\n'),
 /* ---------- vidéo avec sous-titres incrustés ---------- */
 let actx=null,srcNode=null,speaker=null,recorder=null,recCancel=false;
 function ensureGraph(){if(!actx){actx=new (window.AudioContext||window.webkitAudioContext)();srcNode=actx.createMediaElementSource(video);speaker=actx.createGain();srcNode.connect(speaker);speaker.connect(actx.destination);}}
-let recording=false,lastVideo=null;
+let lastVideo=null;
 function recMsg(t,err){const m=$('recmsg');m.textContent=t;m.className='msg'+(err?' err':'');if(recording||err)status(esc(t),err,false);}
 $('go-rec').onclick=()=>$('rec').click();
 $('rec').onclick=()=>{
@@ -578,7 +588,7 @@ $('rec').onclick=()=>{
     let lock=null;try{lock=await navigator.wakeLock.request('screen');}catch(e){}
     let raf;const frame=()=>{drawFrame();
       $('recprogi').style.width=Math.round(video.currentTime/video.duration*100)+'%';
-      recMsg('Fabrication de la vidéo en HD… '+fmt(video.currentTime).slice(3,8)+' / '+fmt(video.duration).slice(3,8)+" (garde l'écran allumé)");
+      const sec=Math.floor(video.currentTime);if(sec!==frame.sec){frame.sec=sec;recMsg('Fabrication de la vidéo en HD… '+fmt(video.currentTime).slice(3,8)+' / '+fmt(video.duration).slice(3,8)+" (garde l'écran allumé)");}
       raf=requestAnimationFrame(frame);};
     frame();
     video.addEventListener('ended',()=>recorder.state!=='inactive'&&recorder.stop(),{once:true});
@@ -629,7 +639,7 @@ self.onmessage=async e=>{
 let worker=null;
 const autoBlocked=inClaude;
 if(autoBlocked){$('auto').disabled=true;}
-let transcribing=false;
+function useCapture(){return isMobile||(mediaFile&&mediaFile.size>400e6);}
 function setMsg(t,err){const m=$('automsg');m.textContent=t;m.className='msg'+(err?' err':'');if(transcribing)status(esc(t),err,false);}
 async function decode(file){
   const buf=await file.arrayBuffer();
@@ -669,7 +679,7 @@ $('auto').onclick=async()=>{
   const btn=$('auto');
   // Sur téléphone, la lecture doit démarrer tout de suite, dans le geste de l'utilisateur
   let playP=null;
-  if(isMobile){try{ensureGraph();actx.resume();video.pause();video.currentTime=0;video.playbackRate=1;$('rate').value='1';playP=video.play();}catch(e){}}
+  if(useCapture()){try{ensureGraph();actx.resume();video.pause();video.currentTime=0;video.playbackRate=1;$('rate').value='1';playP=video.play();}catch(e){}}
   btn.disabled=true;transcribing=true;$('prog').hidden=false;$('progi').style.width='0%';
   try{localStorage.setItem(BUSY,JSON.stringify({model:$('model').value,name:mediaFile.name}));}catch(e){}
   let off=0;
@@ -686,7 +696,7 @@ $('auto').onclick=async()=>{
       worker.onmessage=ev=>{const d=ev.data;
         if(d.type==='progress'&&d.p&&d.p.status==='progress'&&d.p.total){files[d.p.file]=[d.p.loaded,d.p.total];let l=0,t=0;for(const k in files){l+=files[k][0];t+=files[k][1];}$('progi').style.width=Math.round(l/t*100)+'%';setMsg('Téléchargement du modèle… '+Math.round(l/1e6)+' / '+Math.round(t/1e6)+' Mo');}
         else if(d.type==='status'){setMsg(d.text);if(d.text.startsWith('Transcription'))$('progi').style.width='100%';}
-        else if(d.type==='done'){const got=chunksToCues(d.out.chunks||[],video.duration,off);if(!got.length)setMsg('Aucune parole détectée dans ce fichier.',true);else{leaveSample(true);cues=got;save();render();setMsg(got.length+" sous-titres créés. Relis-les et corrige-les avant d'exporter.");transcribing=false;status("✓ "+got.length+" sous-titres créés automatiquement.<small>Choisis un style si tu veux, puis appuie sur « Télécharger la vidéo sous-titrée ».</small>",false,['go-rec']);}resolve();}
+        else if(d.type==='done'){const got=chunksToCues(d.out.chunks||[],video.duration,off);if(!got.length)reject(new Error('aucune parole'));else{cues=got;save();render();transcribing=false;setMsg(got.length+' sous-titres créés.');$('prog').hidden=true;status("✓ "+got.length+" sous-titres créés automatiquement.<small>Choisis un style si tu veux, puis appuie sur « Télécharger la vidéo sous-titrée ».</small>",false,['go-rec']);resolve();}}
         else if(d.type==='error')reject(new Error(d.message));
       };
       worker.postMessage({audio,model:$('model').value,noGpu:isMobile},[audio.buffer]);
@@ -694,21 +704,23 @@ $('auto').onclick=async()=>{
   }catch(err){
     if(worker){worker.terminate();worker=null;}
     const msg=String(err&&err.message);
-    setMsg(msg==='son vide'?"Le son de la vidéo n'a pas pu être écouté. Appuie sur « Lancer la transcription » pour réessayer, sans quitter l'application.":/play|NotAllowed/i.test(msg)?"La lecture a été bloquée par le téléphone. Appuie à nouveau sur « Lancer la transcription ».":/fetch|network|Failed|load|import|worker|module/i.test(msg)?"Le modèle de reconnaissance n'a pas pu être téléchargé. Vérifie ta connexion internet puis relance la transcription.":'Erreur pendant la transcription : '+msg,true);
-  }finally{btn.disabled=false;transcribing=false;try{localStorage.removeItem(BUSY);}catch(e){}if(isMobile&&worker){worker.terminate();worker=null;}if($('status-actions')&&mediaFile&&!cues.length){$('status-actions').hidden=false;}}
+    transcribing=false;$('prog').hidden=true;
+    const text=msg==='aucune parole'?"Aucune parole n'a été reconnue dans cette vidéo.":msg==='son vide'?"Le son de la vidéo n'a pas pu être écouté. Réessaie sans quitter la page.":/play|NotAllowed/i.test(msg)?"La lecture a été bloquée par le téléphone. Appuie à nouveau sur « Lancer la transcription ».":/fetch|network|Failed|load|import|worker|module/i.test(msg)?"Le modèle de reconnaissance n'a pas pu être téléchargé. Vérifie ta connexion internet puis relance la transcription.":'Erreur pendant la transcription : '+msg;
+    setMsg(text,true);status(esc(text),true,true);
+  }finally{btn.disabled=false;transcribing=false;try{localStorage.removeItem(BUSY);}catch(e){}if(isMobile&&worker){worker.terminate();worker=null;}}
 };
 
 /* ---------- démarrage ---------- */
 try{const b=JSON.parse(localStorage.getItem(BUSY)||'null');if(b){localStorage.removeItem(BUSY);
   if(!autoBlocked){$('model').value='onnx-community/whisper-tiny';}
   setTimeout(()=>status("La page s'est rechargée pendant la transcription de « "+esc(b.name||'ta vidéo')+" ».<small>Ton appareil a sans doute manqué de mémoire. J'ai choisi le modèle Léger : rouvre la vidéo et relance. Si ça recommence, essaie une vidéo plus courte (moins de 2 minutes) ou passe par un ordinateur.</small>",true,false),0);}}catch(e){}
-if(autoBlocked){setMsg("Dans cette version en ligne, la transcription automatique ne peut pas télécharger son modèle. Pour l'utiliser, ouvre le fichier soustitreur.html sur ton ordinateur (Chrome ou Edge). Ici, utilise la saisie rapide : elle marche aussi sur téléphone.",true);$('go-auto').hidden=true;}
+if(autoBlocked)setMsg("Dans cet aperçu Claude, la transcription automatique est bloquée. Utilise le site de l'application.",true);
 if(!load()){
   isSample=true;$('sample').hidden=false;
   cues=[{s:0.4,e:3.4,t:'Bonjour à tous et bienvenue\ndans cette nouvelle vidéo.'},{s:3.6,e:7.2,t:"Aujourd'hui, on va voir comment\najouter des sous-titres animés."},{s:7.4,e:10.8,t:'Choisis un style, et ta vidéo\nest prête à publier.'}];
 }
 syncCtrls();renderPresets();fitStage();render();
-if(document.fonts&&document.fonts.load){Promise.all(Object.keys(FONTS).map(f=>document.fonts.load(FONTS[f].w+' 40px "'+f+'"').catch(()=>{}))).then(()=>{renderPresets();drawPreview();});}
+if(document.fonts&&document.fonts.load){['900 40px "Montserrat"','600 40px "IBM Plex Sans"'].forEach(f=>document.fonts.load(f).then(fontReady).catch(()=>{}));}
 requestAnimationFrame(loop);
 })();
 </script>
