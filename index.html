@@ -1,7 +1,7 @@
 <title>Atelier Sous-titres</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Montserrat:wght@600;800;900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Montserrat:wght@600;800;900&family=Poppins:wght@900&family=Bangers&family=Luckiest+Guy&family=Righteous&family=Anton&family=Permanent+Marker&family=Pacifico&family=Lilita+One&family=Bebas+Neue&family=Bungee&display=swap">
 <style>
 /* Layout: régie de sous-titrage — écran, transport et styles à gauche ; la bande des sous-titres et l'export à droite ; une colonne sur téléphone */
 :root{
@@ -59,15 +59,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .sect textarea{width:100%;min-height:62px;resize:vertical;font:500 16px/1.4 var(--f-body);padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
 .hint{font-size:13px;color:var(--muted);max-width:65ch;margin:0}
 kbd{font:500 12px var(--f-mono);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--bg)}
-.presets{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px}
+.presets{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px}
 .preset{flex-direction:column;align-items:stretch;padding:0;overflow:hidden;gap:0;white-space:normal}
-.preset .sw{height:52px;background:#0d1117;display:grid;place-items:center;font:900 15px Montserrat,"Arial Black",sans-serif;color:#fff;letter-spacing:.01em;padding:0 6px;text-align:center}
+.preset canvas{display:block;width:100%;height:auto;aspect-ratio:240/110;background:#101624}
 .preset .nm{font:600 13px var(--f-body);padding:6px 8px;text-align:left}
 .preset[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
-.sw .k{color:var(--hl,#ffd84a)}
-.sw .bx{background:var(--hl,#ffd84a);color:#111;border-radius:5px;padding:1px 5px}
-.sw .cl{background:rgba(0,0,0,.75);color:#ffd84a;font:600 13px var(--f-body);padding:2px 6px}
-.sw .st{-webkit-text-stroke:1px #000;paint-order:stroke}
 .ctrls{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .ctrls label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
 .ctrls .inline{flex-direction:row;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--ink)}
@@ -140,6 +136,7 @@ select{font:500 14px var(--f-body);padding:7px 8px;border-radius:8px;border:1px 
         <h2>Style des sous-titres</h2>
         <div class="presets" id="presets"></div>
         <div class="ctrls">
+          <label>Police<select id="st-font"></select></label>
           <label>Mots à l'écran<select id="st-words"><option value="1">1 mot</option><option value="2">2 mots</option><option value="3">3 mots</option><option value="4">4 mots</option><option value="5">5 mots</option><option value="0">Phrase entière</option></select></label>
           <label>Position<select id="st-pos"><option value="bas">Bas</option><option value="centre">Centre</option><option value="haut">Haut</option></select></label>
           <label>Taille<input id="st-size" type="range" min="3" max="14" step="0.5"></label>
@@ -227,25 +224,48 @@ const KEY='atelier-sous-titres-v1', SKEY='atelier-sous-titres-style-v1';
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /* ---------- styles animés ---------- */
-const PRESETS={
-  impact:{nm:'Impact',sw:'<span class="st">C\'EST </span><span class="k st">PARTI</span>',words:3,size:8,upper:true,hl:'#ffd84a',anim:true,mode:'pop'},
-  karaoke:{nm:'Karaoké',sw:'<span>On y </span><span class="k">va</span>',words:5,size:6,upper:false,hl:'#4ade80',anim:false,mode:'color'},
-  bulle:{nm:'Bulle',sw:'<span>Trop </span><span class="bx">bien</span>',words:4,size:6.5,upper:false,hl:'#ffd84a',anim:true,mode:'box'},
-  mot:{nm:'Mot à mot',sw:'<span class="k st" style="font-size:20px">WOW</span>',words:1,size:12,upper:true,hl:'#ff5a5a',anim:true,mode:'pop'},
-  classique:{nm:'Classique',sw:'<span class="cl">Bonjour à tous</span>',words:0,size:5,upper:false,hl:'#ffd84a',anim:false,mode:'classic'}
+const FONTS={
+  'Montserrat':{w:900,nm:'Montserrat (gras)'},'Poppins':{w:900,nm:'Poppins (rond)'},'Bangers':{w:400,nm:'Bangers (BD)'},
+  'Luckiest Guy':{w:400,nm:'Luckiest Guy (fun)'},'Righteous':{w:400,nm:'Righteous (rétro)'},'Anton':{w:400,nm:'Anton (géant)'},
+  'Bebas Neue':{w:400,nm:'Bebas Neue (cinéma)'},'Bungee':{w:400,nm:'Bungee (street)'},'Lilita One':{w:400,nm:'Lilita One (doux)'},
+  'Permanent Marker':{w:400,nm:'Permanent Marker (feutre)'},'Pacifico':{w:400,nm:'Pacifico (manuscrit)'},'IBM Plex Sans':{w:600,nm:'Plex Sans (sobre)'}
 };
-let st={preset:'impact',words:3,size:8,upper:true,hl:'#ffd84a',anim:true,pos:'bas',ratio:'16:9',bg:'#141a2a'};
+const PRESETS={
+  impact:{nm:'Impact',font:'Montserrat',mode:'pop',words:3,size:8,upper:true,hl:'#ffd84a',anim:true},
+  comic:{nm:'BD',font:'Bangers',mode:'wobble',words:3,size:10,upper:true,hl:'#ffd84a',anim:true,stroke:.2},
+  gaming:{nm:'Gaming',font:'Luckiest Guy',mode:'bounce',words:3,size:8.5,upper:true,hl:'#3ef0ff',anim:true},
+  neon:{nm:'Néon',font:'Righteous',mode:'glow',words:4,size:7.5,upper:false,hl:'#ff3df2',anim:true},
+  titan:{nm:'Géant',font:'Anton',mode:'pop',words:2,size:13,upper:true,hl:'#ff7a1a',anim:true,stroke:.14},
+  degrade:{nm:'Dégradé',font:'Poppins',mode:'gradient',words:3,size:8,upper:true,hl:'#ff4d8d',anim:true},
+  street:{nm:'Street',font:'Bungee',mode:'shadow3d',words:3,size:7,upper:true,hl:'#b8ff3a',anim:true},
+  marqueur:{nm:'Surligneur',font:'Permanent Marker',mode:'underline',words:4,size:7,upper:false,hl:'#ffd84a',anim:false},
+  apparition:{nm:'Apparition',font:'Lilita One',mode:'reveal',words:6,size:7.5,upper:false,hl:'#ffd84a',anim:false},
+  karaoke:{nm:'Karaoké',font:'Montserrat',mode:'color',words:5,size:6,upper:false,hl:'#4ade80',anim:false},
+  bulle:{nm:'Bulle',font:'Montserrat',mode:'box',words:4,size:6.5,upper:false,hl:'#ffd84a',anim:true},
+  elegant:{nm:'Élégant',font:'Pacifico',mode:'soft',words:5,size:6.5,upper:false,hl:'#ffc2d6',anim:true},
+  cinema:{nm:'Cinéma',font:'Bebas Neue',mode:'cine',words:0,size:7,upper:true,hl:'#ffffff',anim:false},
+  mot:{nm:'Mot à mot',font:'Montserrat',mode:'pop',words:1,size:12,upper:true,hl:'#ff5a5a',anim:true},
+  classique:{nm:'Classique',font:'IBM Plex Sans',mode:'classic',words:0,size:5,upper:false,hl:'#ffd84a',anim:false}
+};
+let st={preset:'impact',font:'Montserrat',words:3,size:8,upper:true,hl:'#ffd84a',anim:true,pos:'bas',ratio:'16:9',bg:'#141a2a'};
 try{Object.assign(st,JSON.parse(localStorage.getItem(SKEY)||'{}'));}catch(e){}
+if(!PRESETS[st.preset])st.preset='impact';if(!FONTS[st.font])st.font=PRESETS[st.preset].font;
 function saveStyle(){try{localStorage.setItem(SKEY,JSON.stringify(st));}catch(e){}}
+function styleOf(k){const p=PRESETS[k];return {font:p.font,mode:p.mode,upper:p.upper,hl:p.hl,stroke:p.stroke,anim:false,size:30,pos:'centre'};}
 function renderPresets(){
   const box=$('presets');box.innerHTML='';
-  for(const k in PRESETS){const p=PRESETS[k];const b=document.createElement('button');b.className='preset';b.setAttribute('aria-pressed',st.preset===k);b.style.setProperty('--hl',p.hl);
-    b.innerHTML='<div class="sw">'+p.sw+'</div><div class="nm">'+p.nm+'</div>';
-    b.onclick=()=>{st.preset=k;Object.assign(st,{words:p.words,size:p.size,upper:p.upper,hl:p.hl,anim:p.anim});syncCtrls();saveStyle();renderPresets();drawPreview();};
+  for(const k in PRESETS){const p=PRESETS[k];const b=document.createElement('button');b.className='preset';b.setAttribute('aria-pressed',st.preset===k);
+    const cv=document.createElement('canvas');cv.width=240;cv.height=110;
+    const nm=document.createElement('div');nm.className='nm';nm.textContent=p.nm;
+    b.append(cv,nm);
+    const pg={words:[{w:"C'est",s:0,e:.5},{w:'parti',s:.5,e:1}],s:0,active:1};
+    renderPage(cv.getContext('2d'),240,110,pg,.75,styleOf(k));
+    b.onclick=()=>{st.preset=k;Object.assign(st,{font:p.font,words:p.words,size:p.size,upper:p.upper,hl:p.hl,anim:p.anim});syncCtrls();saveStyle();renderPresets();drawPreview();};
     box.appendChild(b);}
 }
-function syncCtrls(){$('st-words').value=st.words;$('st-pos').value=st.pos;$('st-size').value=st.size;$('st-hl').value=st.hl;$('st-upper').checked=st.upper;$('st-anim').checked=st.anim;$('st-ratio').value=st.ratio;$('st-bg').value=st.bg;}
-[['st-words','words',v=>+v],['st-pos','pos',v=>v],['st-size','size',v=>+v],['st-hl','hl',v=>v],['st-ratio','ratio',v=>v],['st-bg','bg',v=>v]].forEach(([id,k,f])=>$(id).addEventListener('input',e=>{st[k]=f(e.target.value);saveStyle();if(k==='ratio')fitStage();drawPreview();}));
+$('st-font').innerHTML=Object.keys(FONTS).map(f=>'<option value="'+f+'">'+FONTS[f].nm+'</option>').join('');
+function syncCtrls(){$('st-font').value=st.font;$('st-words').value=st.words;$('st-pos').value=st.pos;$('st-size').value=st.size;$('st-hl').value=st.hl;$('st-upper').checked=st.upper;$('st-anim').checked=st.anim;$('st-ratio').value=st.ratio;$('st-bg').value=st.bg;}
+[['st-font','font',v=>v],['st-words','words',v=>+v],['st-pos','pos',v=>v],['st-size','size',v=>+v],['st-hl','hl',v=>v],['st-ratio','ratio',v=>v],['st-bg','bg',v=>v]].forEach(([id,k,f])=>$(id).addEventListener('input',e=>{st[k]=f(e.target.value);saveStyle();if(k==='ratio')fitStage();drawPreview();}));
 $('st-upper').onchange=e=>{st.upper=e.target.checked;saveStyle();drawPreview();};
 $('st-anim').onchange=e=>{st.anim=e.target.checked;saveStyle();drawPreview();};
 
@@ -317,33 +337,51 @@ function pageAt(t){
   for(let i=0;i<ws.length;i+=n){const pg=ws.slice(i,i+n);const e=pg[pg.length-1].e;if(t<e||i+n>=ws.length)return {words:pg,s:pg[0].s,active:pg.findIndex(w=>t>=w.s&&t<w.e)};}
   return null;
 }
-function fontFor(mode,fs){return (mode==='classic'?'600 ':'900 ')+fs+'px Montserrat,"Arial Black",Arial,sans-serif';}
-function drawCaptions(ctx,W,H,t){
-  const pg=pageAt(t);if(!pg)return;
-  const mode=PRESETS[st.preset]?PRESETS[st.preset].mode:'pop';
-  const base=Math.min(W,H),fs=Math.round(base*st.size/100);
-  ctx.font=fontFor(mode,fs);ctx.textBaseline='alphabetic';
-  const words=pg.words.map(w=>st.upper?w.w.toLocaleUpperCase('fr-FR'):w.w);
-  const space=ctx.measureText(' ').width,maxW=W*0.86;
+function fontStr(S,fs){const f=FONTS[S.font]||FONTS['Montserrat'];return f.w+' '+fs+'px "'+S.font+'","Arial Black",Arial,sans-serif';}
+function curStyle(){const p=PRESETS[st.preset]||PRESETS.impact;return {font:st.font,mode:p.mode,upper:st.upper,hl:st.hl,stroke:p.stroke,anim:st.anim,size:st.size,pos:st.pos};}
+function drawCaptions(ctx,W,H,t){const pg=pageAt(t);if(pg)renderPage(ctx,W,H,pg,t,curStyle());}
+function roundBox(ctx,x,y,w,h,r){ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x,y,w,h,r);else ctx.rect(x,y,w,h);ctx.fill();}
+function renderPage(ctx,W,H,pg,t,S){
+  const mode=S.mode,base=Math.min(W,H),fs=Math.max(8,Math.round(base*S.size/100));
+  ctx.save();
+  ctx.font=fontStr(S,fs);ctx.textBaseline='alphabetic';
+  if('letterSpacing' in ctx)ctx.letterSpacing=mode==='cine'?Math.round(fs*0.06)+'px':'0px';
+  const words=pg.words.map(w=>S.upper?w.w.toLocaleUpperCase('fr-FR'):w.w);
+  const space=ctx.measureText(' ').width*(mode==='cine'?1.2:/pop|wobble|gradient|bounce|reveal/.test(mode)?1.45:1.1),maxW=W*0.88;
   const lines=[[]];let lw=0;
   words.forEach((w,i)=>{const ww=ctx.measureText(w).width;if(lines[lines.length-1].length&&lw+space+ww>maxW){lines.push([]);lw=0;}const L=lines[lines.length-1];L.push({i,w,ww});lw+=(L.length>1?space:0)+ww;});
-  const lh=fs*1.22,blockH=lines.length*lh;
-  let top=st.pos==='haut'?H*0.12:st.pos==='centre'?(H-blockH)/2:H*0.88-blockH;
-  let k=1;if(st.anim&&!reduce){const p=Math.min(1,(t-pg.s)/0.14);k=0.82+0.18*(1-Math.pow(1-p,3));}
-  ctx.save();ctx.translate(W/2,top+blockH/2);ctx.scale(k,k);ctx.translate(-W/2,-(top+blockH/2));
-  ctx.lineJoin='round';
+  const lh=fs*(S.font==='Pacifico'?1.45:1.22),blockH=lines.length*lh;
+  const top=S.pos==='haut'?H*0.12:S.pos==='centre'?(H-blockH)/2:H*0.88-blockH;
+  let k=1;if(S.anim&&!reduce){const p=Math.min(1,(t-pg.s)/0.14);k=0.82+0.18*(1-Math.pow(1-p,3));}
+  ctx.translate(W/2,top+blockH/2);ctx.scale(k,k);ctx.translate(-W/2,-(top+blockH/2));
+  ctx.lineJoin='round';ctx.miterLimit=2;
+  const strokeW=fs*(S.stroke||0.16);
   lines.forEach((L,li)=>{
     const total=L.reduce((a,b)=>a+b.ww,0)+space*(L.length-1);let x=(W-total)/2;const y=top+li*lh+fs*0.95;
     if(mode==='classic'){ctx.fillStyle='rgba(0,0,0,0.72)';ctx.fillRect(x-fs*0.3,y-fs*0.95,total+fs*0.6,lh);}
     L.forEach(o=>{
-      const on=o.i===pg.active;let fill='#ffffff';
-      if(mode==='classic')fill='#ffd84a';
-      else if(on&&(mode==='pop'||mode==='color'))fill=st.hl;
+      const on=o.i===pg.active,wd=pg.words[o.i]||{s:0,e:1};
+      const prog=Math.min(1,Math.max(0,(t-wd.s)/Math.max(0.05,wd.e-wd.s)));
+      const cx=x+o.ww/2,cy=y-fs*0.35;
+      if(mode==='reveal'&&pg.active>=0&&o.i>pg.active){x+=o.ww+space;return;}
       ctx.save();
-      if(on&&mode==='pop'){const cx=x+o.ww/2,cy=y-fs*0.35;ctx.translate(cx,cy);ctx.scale(1.1,1.1);ctx.translate(-cx,-cy);}
-      if(on&&mode==='box'){ctx.fillStyle=st.hl;const px=fs*0.18;ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x-px,y-fs*0.9,o.ww+px*2,fs*1.15,fs*0.18);else ctx.rect(x-px,y-fs*0.9,o.ww+px*2,fs*1.15);ctx.fill();fill='#111111';}
-      if(mode==='pop'||mode==='color'){ctx.lineWidth=fs*0.16;ctx.strokeStyle='#000000';ctx.strokeText(o.w,x,y);}
-      if(mode==='box'&&!on){ctx.shadowColor='rgba(0,0,0,.85)';ctx.shadowBlur=fs*0.25;ctx.shadowOffsetY=fs*0.05;}
+      let fill='#ffffff',stroke=true;
+      switch(mode){
+        case 'pop':if(on){fill=S.hl;ctx.translate(cx,cy);ctx.scale(1.12,1.12);ctx.translate(-cx,-cy);}break;
+        case 'wobble':{const r=(o.i%2?-1:1)*0.05;ctx.translate(cx,cy);ctx.rotate(r);if(on){ctx.scale(1.18,1.18);fill=S.hl;}ctx.translate(-cx,-cy);break;}
+        case 'bounce':if(on){fill=S.hl;ctx.translate(0,-fs*0.18*Math.sin(Math.PI*Math.min(1,prog*2)));}break;
+        case 'color':if(on)fill=S.hl;break;
+        case 'gradient':if(on){const g=ctx.createLinearGradient(x,y-fs,x+o.ww,y);g.addColorStop(0,S.hl);g.addColorStop(1,'#ffb347');fill=g;ctx.translate(cx,cy);ctx.scale(1.1,1.1);ctx.translate(-cx,-cy);}break;
+        case 'reveal':if(on){fill=S.hl;const q=reduce?1:Math.min(1,(t-wd.s)/0.12);const sc=0.6+0.4*(1-Math.pow(1-q,3));ctx.translate(cx,cy);ctx.scale(sc,sc);ctx.translate(-cx,-cy);}break;
+        case 'glow':stroke=false;fill=on?'#ffffff':S.hl;ctx.shadowColor=S.hl;ctx.shadowBlur=on?fs*0.9:fs*0.4;ctx.fillStyle=fill;ctx.fillText(o.w,x,y);break;
+        case 'shadow3d':{stroke=false;const d=Math.max(2,fs*0.07);ctx.fillStyle='#111111';for(let i=d;i>0;i-=1)ctx.fillText(o.w,x+i,y+i);fill=on?S.hl:'#ffffff';if(on){ctx.translate(-d*0.4,-d*0.4);}break;}
+        case 'underline':{stroke=false;if(on||pg.active>o.i){ctx.save();ctx.fillStyle=S.hl;ctx.globalAlpha=0.9;const w=o.ww*(on&&!reduce?Math.min(1,prog*1.6):1);ctx.translate(x,y-fs*0.55);ctx.rotate(-0.02);roundBox(ctx,-fs*0.08,0,w+fs*0.16,fs*0.62,fs*0.12);ctx.restore();}fill=(on||pg.active>o.i)?'#141414':'#ffffff';if(fill==='#ffffff'){ctx.shadowColor='rgba(0,0,0,.85)';ctx.shadowBlur=fs*0.2;}break;}
+        case 'soft':stroke=false;if(on)fill=S.hl;ctx.shadowColor='rgba(0,0,0,.75)';ctx.shadowBlur=fs*0.3;ctx.shadowOffsetY=fs*0.06;break;
+        case 'cine':stroke=false;ctx.shadowColor='rgba(0,0,0,.9)';ctx.shadowBlur=fs*0.25;ctx.shadowOffsetY=fs*0.05;break;
+        case 'box':stroke=false;if(on){ctx.fillStyle=S.hl;const px=fs*0.18;roundBox(ctx,x-px,y-fs*0.9,o.ww+px*2,fs*1.15,fs*0.18);fill='#111111';}else{ctx.shadowColor='rgba(0,0,0,.85)';ctx.shadowBlur=fs*0.25;ctx.shadowOffsetY=fs*0.05;}break;
+        case 'classic':stroke=false;fill='#ffd84a';break;
+      }
+      if(stroke){ctx.lineWidth=strokeW;ctx.strokeStyle='#000000';ctx.strokeText(o.w,x,y);}
       ctx.fillStyle=fill;ctx.fillText(o.w,x,y);
       ctx.restore();
       x+=o.ww+space;
@@ -625,7 +663,7 @@ if(!load()){
   cues=[{s:0.4,e:3.4,t:'Bonjour à tous et bienvenue\ndans cette nouvelle vidéo.'},{s:3.6,e:7.2,t:"Aujourd'hui, on va voir comment\najouter des sous-titres animés."},{s:7.4,e:10.8,t:'Choisis un style, et ta vidéo\nest prête à publier.'}];
 }
 syncCtrls();renderPresets();fitStage();render();
-if(document.fonts&&document.fonts.load){Promise.all([document.fonts.load('900 40px Montserrat'),document.fonts.load('600 40px Montserrat')]).then(drawPreview).catch(()=>{});}
+if(document.fonts&&document.fonts.load){Promise.all(Object.keys(FONTS).map(f=>document.fonts.load(FONTS[f].w+' 40px "'+f+'"').catch(()=>{}))).then(()=>{renderPresets();drawPreview();});}
 requestAnimationFrame(loop);
 })();
 </script>
