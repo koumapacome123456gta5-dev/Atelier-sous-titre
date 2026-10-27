@@ -559,7 +559,110 @@ function ensureGraph(){if(!actx){actx=new (window.AudioContext||window.webkitAud
 let lastVideo=null;
 function recMsg(t,err){const m=$('recmsg');m.textContent=t;m.className='msg'+(err?' err':'');if(recording||err)status(esc(t),err,false);}
 $('go-rec').onclick=()=>$('rec').click();
-$('rec').onclick=()=>{
+/* Export « propre » : le son d'origine est réencodé tel quel (pas d'enregistrement en direct)
+   et chaque image porte l'horodatage exact de la vidéo → aucun saut, aucun décalage voix/image. */
+const canOffline=()=>typeof VideoEncoder==='function'&&typeof AudioEncoder==='function'&&typeof VideoFrame==='function'&&mediaFile&&(!isMobile||mediaFile.size<150e6);
+let offCancel=false;
+async function exportOffline(W,H,cv,draw,onProgress){
+  const {Muxer,ArrayBufferTarget}=await import('https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.3/+esm');
+  const fps=30,dur=video.duration;
+  onProgress(0,'Préparation du son…');
+  let ab=null;
+  try{const c=new (window.AudioContext||window.webkitAudioContext)();ab=await c.decodeAudioData(await mediaFile.arrayBuffer());try{c.close();}catch(e){}}catch(e){ab=null;}
+  const vbr=isMobile?Math.min(10e6,Math.max(5e6,Math.round(W*H*fps*0.12))):Math.min(20e6,Math.max(8e6,Math.round(W*H*fps*0.16)));
+  let vcfg=null;
+  for(const codec of ['avc1.640028','avc1.4d0028','avc1.42e01f']){const cfg={codec,width:W,height:H,bitrate:vbr,framerate:fps};try{if((await VideoEncoder.isConfigSupported(cfg)).supported){vcfg=cfg;break;}}catch(e){}}
+  if(!vcfg)throw new Error('codec vidéo');
+  let acfg=null,akind=null;
+  if(ab){const ch=Math.min(2,ab.numberOfChannels);for(const [codec,kind] of [['mp4a.40.2','aac'],['opus','opus']]){const cfg={codec,sampleRate:ab.sampleRate,numberOfChannels:ch,bitrate:192000};try{if((await AudioEncoder.isConfigSupported(cfg)).supported){acfg=cfg;akind=kind;break;}}catch(e){}}}
+  const muxer=new Muxer(Object.assign({target:new ArrayBufferTarget(),video:{codec:'avc',width:W,height:H,frameRate:fps},fastStart:'in-memory',firstTimestampBehavior:'offset'},acfg?{audio:{codec:akind,numberOfChannels:acfg.numberOfChannels,sampleRate:acfg.sampleRate}}:{}));
+  let failure=null;
+  // Son : encodé directement depuis le fichier, par blocs d'une seconde
+  if(acfg){
+    const aenc=new AudioEncoder({output:(c,m)=>muxer.addAudioChunk(c,m),error:e=>failure=e});aenc.configure(acfg);
+    const ch=acfg.numberOfChannels,sr=ab.sampleRate,chans=[];
+    // Compense le délai d'amorçage de l'encodeur (AAC : 2112 échantillons, Opus : 312) pour caler la voix à l'image près
+    const skip=Math.min(ab.length-1,Math.round((akind==='aac'?2112:312)*sr/48000)),len=ab.length-skip;
+    for(let c=0;c<ch;c++)chans.push(ab.getChannelData(Math.min(c,ab.numberOfChannels-1)).subarray(skip));
+    for(let off=0;off<len;off+=sr){const n=Math.min(sr,len-off),buf=new Float32Array(n*ch);for(let c=0;c<ch;c++)buf.set(chans[c].subarray(off,off+n),c*n);
+      const ad=new AudioData({format:'f32-planar',sampleRate:sr,numberOfFrames:n,numberOfChannels:ch,timestamp:Math.round(off/sr*1e6),data:buf});aenc.encode(ad);ad.close();}
+    await aenc.flush();aenc.close();
+  }
+  ab=null;
+  const venc=new VideoEncoder({output:(c,m)=>muxer.addVideoChunk(c,m),error:e=>failure=e});venc.configure(vcfg);
+  let count=0;
+  const push=async t=>{draw(t);const f=new VideoFrame(cv,{timestamp:Math.round(t*1e6)});venc.encode(f,{keyFrame:count%(fps*2)===0});f.close();count++;
+    while(venc.encodeQueueSize>6)await new Promise(r=>setTimeout(r,1));};
+  if(isAudio){
+    // Son seul : on fabrique les images directement, plus vite que le temps réel
+    const N=Math.max(1,Math.ceil(dur*fps));
+    for(let i=0;i<N;i++){if(offCancel)throw new Error('annulé');if(failure)throw failure;await push(i/fps);if(i%fps===0){onProgress(i/fps);await new Promise(r=>setTimeout(r,0));}}
+  }else{
+    // Vidéo : lecture muette, une image encodée par image réellement affichée, avec son heure exacte
+    const wasMuted=video.muted;video.muted=true;video.pause();video.currentTime=0;video.playbackRate=1;
+    await new Promise(r=>{video.addEventListener('seeked',r,{once:true});setTimeout(r,1500);});
+    await push(0);
+    await new Promise((resolve,reject)=>{
+      let last=0,busy=false,ended=false;
+      const finish=()=>{ended=true;resolve();};
+      const onFrame=async(nowTs,meta)=>{
+        if(ended)return;
+        if(offCancel){video.pause();return reject(new Error('annulé'));}
+        if(failure){video.pause();return reject(failure);}
+        const t=meta.mediaTime;
+        if(t>last+0.001&&!busy){busy=true;last=t;await push(t);busy=false;onProgress(t);}
+        if(!video.ended)video.requestVideoFrameCallback(onFrame);
+      };
+      video.addEventListener('ended',finish,{once:true});
+      video.requestVideoFrameCallback(onFrame);
+      video.play().catch(reject);
+    }).finally(()=>{video.muted=wasMuted;});
+  }
+  if(failure)throw failure;
+  await venc.flush();venc.close();muxer.finalize();
+  return new Blob([muxer.target.buffer],{type:'video/mp4'});
+}
+function finishExport(blob,ext,W,H){
+  lastVideo={blob,name:mediaName+'-sous-titres.'+ext};
+  const size=(blob.size/1e6).toFixed(1).replace('.',',')+' Mo';
+  $('recmsg').textContent='Vidéo prête : '+W+'×'+H+', '+size+'.';$('recmsg').className='msg';
+  const file=new File([blob],lastVideo.name,{type:blob.type});
+  const canShare=!inClaude&&isMobile&&navigator.canShare&&navigator.canShare({files:[file]});
+  if(canShare)status('✓ Ta vidéo sous-titrée est prête ('+W+'×'+H+', '+size+').<small>Appuie sur « Enregistrer la vidéo », puis choisis « Enregistrer la vidéo » pour la mettre dans ta galerie.</small>',false,['go-save','go-file']);
+  else{status('✓ Ta vidéo sous-titrée est prête ('+W+'×'+H+', '+size+').<small>Le téléchargement démarre. S\'il ne démarre pas, appuie sur « Télécharger le fichier ».</small>',false,['go-file']);offer(lastVideo.name,blob);}
+}
+async function runOffline(W,H){
+  const cv=document.createElement('canvas');cv.width=W;cv.height=H;const cx=cv.getContext('2d',{alpha:false});
+  const draw=t=>{if(isAudio){cx.fillStyle=st.bg;cx.fillRect(0,0,W,H);}else{cx.drawImage(video,0,0,W,H);}drawCaptions(cx,W,H,t);};
+  recording=true;offCancel=false;$('rec').disabled=true;$('rec-stop').hidden=false;$('recprog').hidden=false;
+  cv.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000';stage.appendChild(cv);cap.style.visibility='hidden';
+  let lock=null;try{lock=await navigator.wakeLock.request('screen');}catch(e){}
+  let lastSec=-1;
+  const onProgress=(t,label)=>{const sec=Math.floor(t);if(label||sec!==lastSec){lastSec=sec;$('recprogi').style.width=Math.round(t/video.duration*100)+'%';recMsg(label||('Fabrication de la vidéo… '+fmt(t).slice(3,8)+' / '+fmt(video.duration).slice(3,8)+" (reste sur cet onglet)"));}};
+  try{
+    const blob=await exportOffline(W,H,cv,draw,onProgress);
+    finishExport(blob,'mp4',W,H);
+    return true;
+  }catch(e){
+    if(offCancel){status('Fabrication annulée.',false,['go-rec']);return true;}
+    console.warn('Export image par image impossible, passage en enregistrement direct',e);
+    return false;
+  }finally{
+    try{lock&&lock.release();}catch(e){}
+    cv.remove();cap.style.visibility='';recording=false;$('rec').disabled=false;$('rec-stop').hidden=true;$('recprog').hidden=true;drawPreview();
+  }
+}
+$('rec').onclick=async()=>{
+  if(hasMedia()&&cues.length&&!recording&&!transcribing&&canOffline()){
+    const maxSide=isMobile?1280:1920;let W,H;
+    if(isAudio){const [a,b]=st.ratio.split(':').map(Number);if(a>=b){W=maxSide;H=Math.round(maxSide*b/a);}else{H=maxSide;W=Math.round(maxSide*a/b);}}
+    else{W=video.videoWidth;H=video.videoHeight;const sc=Math.min(1,maxSide/Math.max(W,H));W=Math.round(W*sc);H=Math.round(H*sc);}
+    W-=W%2;H-=H%2;
+    if(await runOffline(W,H))return;
+  }
+  recordRealtime();
+};
+function recordRealtime(){
   if(!hasMedia())return recMsg("Ouvre d'abord une vidéo ou un son.",true);
   if(!cues.length)return recMsg("Il n'y a pas encore de sous-titres : lance d'abord la transcription.",true);
   if(!window.MediaRecorder)return recMsg("Ce navigateur ne sait pas fabriquer de vidéo. Essaie Chrome, Edge ou Safari à jour.",true);
@@ -631,10 +734,10 @@ $('rec').onclick=()=>{
       offer(lastVideo.name,blob);
     }
   })();
-};
+}
 $('go-save').onclick=async()=>{if(!lastVideo)return;const file=new File([lastVideo.blob],lastVideo.name,{type:lastVideo.blob.type});try{await navigator.share({files:[file],title:lastVideo.name});}catch(e){if(e&&e.name!=='AbortError')offer(lastVideo.name,lastVideo.blob);}};
 $('go-file').onclick=()=>{if(lastVideo)offer(lastVideo.name,lastVideo.blob);};
-$('rec-stop').onclick=()=>{recCancel=true;video.pause();if(recorder&&recorder.state!=='inactive')recorder.stop();};
+$('rec-stop').onclick=()=>{offCancel=true;recCancel=true;video.pause();if(recorder&&recorder.state!=='inactive')recorder.stop();};
 
 /* ---------- transcription automatique (Whisper dans le navigateur) ---------- */
 const workerCode=`
