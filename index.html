@@ -69,6 +69,13 @@ kbd{font:500 12px var(--f-mono);border:1px solid var(--line);border-bottom-width
 .preset canvas{display:block;width:100%;height:auto;aspect-ratio:240/110;background:#101624}
 .preset .nm{font:600 13px var(--f-body);padding:6px 8px;text-align:left}
 .preset[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+.sub{font:600 13px var(--f-body);margin:4px 0 0;color:var(--ink)}
+.mine-item{position:relative}
+.mine-item .del{position:absolute;top:4px;right:4px;padding:2px 7px;font-size:12px;border-radius:6px;background:rgba(0,0,0,.6);color:#fff;border-color:transparent}
+.builder{display:flex;flex-direction:column;gap:12px;background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.builder .hint{max-width:none}
+.save-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.save-row input{flex:1 1 160px;min-width:0;font:500 15px var(--f-body);padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
 .ctrls{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .ctrls label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
 .ctrls .inline{flex-direction:row;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--ink)}
@@ -138,15 +145,40 @@ select{font:500 14px var(--f-body);padding:7px 8px;border-radius:8px;border:1px 
 
       <div class="sect">
         <h2>Style des sous-titres</h2>
+        <div id="mine-wrap" hidden>
+          <p class="sub">Mes styles</p>
+          <div class="presets" id="mine"></div>
+        </div>
+        <p class="sub">Styles prêts</p>
         <div class="presets" id="presets"></div>
-        <div class="ctrls">
-          <label>Police<select id="st-font"></select></label>
-          <label>Mots à l'écran<select id="st-words"><option value="1">1 mot</option><option value="2">2 mots</option><option value="3">3 mots</option><option value="4">4 mots</option><option value="5">5 mots</option><option value="0">Phrase entière</option></select></label>
-          <label>Position<select id="st-pos"><option value="bas">Bas</option><option value="centre">Centre</option><option value="haut">Haut</option></select></label>
-          <label>Taille<input id="st-size" type="range" min="3" max="14" step="0.5"></label>
-          <label>Couleur du mot actif<input id="st-hl" type="color"></label>
-          <label class="inline"><input id="st-upper" type="checkbox"> Majuscules</label>
-          <label class="inline"><input id="st-anim" type="checkbox"> Animation d'entrée</label>
+        <div class="builder">
+          <p class="sub" style="margin:0">Créer mon style</p>
+          <p class="hint">Pars d'un style ci-dessus, puis mélange : la police d'un style, l'effet d'un autre, tes couleurs, ton contour, ton ombre. L'aperçu se met à jour en direct.</p>
+          <div class="ctrls">
+            <label>Police<select id="st-font"></select></label>
+            <label>Effet animé<select id="st-mode">
+              <option value="none">Aucun (texte fixe)</option><option value="color">Couleur sur le mot dit</option><option value="pop">Zoom sur le mot dit</option><option value="wobble">Penché façon BD</option><option value="bounce">Rebond</option><option value="gradient">Dégradé</option><option value="reveal">Apparition mot par mot</option><option value="glow">Lueur néon</option><option value="shadow3d">Relief 3D</option><option value="underline">Surligneur</option><option value="box">Bulle de couleur</option>
+            </select></label>
+            <label>Mots à l'écran<select id="st-words"><option value="1">1 mot</option><option value="2">2 mots</option><option value="3">3 mots</option><option value="4">4 mots</option><option value="5">5 mots</option><option value="6">6 mots</option><option value="0">Phrase entière</option></select></label>
+            <label>Position<select id="st-pos"><option value="bas">Bas</option><option value="centre">Centre</option><option value="haut">Haut</option></select></label>
+            <label>Taille<input id="st-size" type="range" min="3" max="14" step="0.5"></label>
+            <label>Espacement des lettres<input id="st-spacing" type="range" min="0" max="15" step="1"></label>
+            <label>Couleur du texte<input id="st-fill" type="color"></label>
+            <label>Couleur du mot dit<input id="st-hl" type="color"></label>
+            <label>2ᵉ couleur (dégradé, lueur)<input id="st-hl2" type="color"></label>
+            <label>Épaisseur du contour<input id="st-stroke" type="range" min="0" max="30" step="1"></label>
+            <label>Couleur du contour / relief<input id="st-strokeColor" type="color"></label>
+            <label>Ombre<input id="st-shadow" type="range" min="0" max="100" step="5"></label>
+            <label class="inline"><input id="st-band" type="checkbox"> Bande de fond derrière le texte</label>
+            <label>Couleur de la bande<input id="st-bandColor" type="color"></label>
+            <label>Opacité de la bande<input id="st-bandAlpha" type="range" min="10" max="100" step="5"></label>
+            <label class="inline"><input id="st-upper" type="checkbox"> Majuscules</label>
+            <label class="inline"><input id="st-anim" type="checkbox"> Animation d'entrée</label>
+          </div>
+          <div class="save-row">
+            <input id="st-name" type="text" maxlength="24" placeholder="Nom de mon style (ex. Mon style TikTok)" aria-label="Nom du style">
+            <button id="st-save" class="primary">Enregistrer mon style</button>
+          </div>
         </div>
         <div class="ctrls" id="audio-fmt" hidden>
           <label>Format de la vidéo (son)<select id="st-ratio"><option value="16:9">Paysage 16:9</option><option value="9:16">Vertical 9:16 (TikTok, Reels)</option><option value="1:1">Carré 1:1</option></select></label>
@@ -246,59 +278,86 @@ const FONTS={
   'Permanent Marker':{w:400,nm:'Permanent Marker (feutre)',cat:'Manuscrit et élégant'},'Caveat Brush':{w:400,nm:'Caveat Brush (craie)',cat:'Manuscrit et élégant'},'Abril Fatface':{w:400,nm:'Abril Fatface (magazine)',cat:'Manuscrit et élégant'},
   'Bebas Neue':{w:400,nm:'Bebas Neue (cinéma)',cat:'Sobre'},'IBM Plex Sans':{w:600,nm:'Plex Sans',cat:'Sobre'}
 };
+const BASE={font:'Montserrat',mode:'pop',words:3,size:8,upper:true,fill:'#ffffff',hl:'#ffd84a',hl2:'#ffb347',stroke:0.16,strokeColor:'#000000',shadow:0,spacing:0,band:false,bandColor:'#000000',bandAlpha:0.72,anim:true};
+const STYLE_KEYS=Object.keys(BASE);
 const PRESETS={
-  impact:{nm:'Impact',font:'Montserrat',mode:'pop',words:3,size:8,upper:true,hl:'#ffd84a',anim:true},
-  comic:{nm:'BD',font:'Bangers',mode:'wobble',words:3,size:10,upper:true,hl:'#ffd84a',anim:true,stroke:.2},
-  gaming:{nm:'Gaming',font:'Luckiest Guy',mode:'bounce',words:3,size:8.5,upper:true,hl:'#3ef0ff',anim:true},
-  neon:{nm:'Néon',font:'Righteous',mode:'glow',words:4,size:7.5,upper:false,hl:'#ff3df2',anim:true},
-  titan:{nm:'Géant',font:'Anton',mode:'pop',words:2,size:13,upper:true,hl:'#ff7a1a',anim:true,stroke:.14},
-  degrade:{nm:'Dégradé',font:'Poppins',mode:'gradient',words:3,size:8,upper:true,hl:'#ff4d8d',anim:true},
-  street:{nm:'Street',font:'Bungee',mode:'shadow3d',words:3,size:7,upper:true,hl:'#b8ff3a',anim:true},
-  marqueur:{nm:'Surligneur',font:'Permanent Marker',mode:'underline',words:4,size:7,upper:false,hl:'#ffd84a',anim:false},
-  apparition:{nm:'Apparition',font:'Lilita One',mode:'reveal',words:6,size:7.5,upper:false,hl:'#ffd84a',anim:false},
-  karaoke:{nm:'Karaoké',font:'Montserrat',mode:'color',words:5,size:6,upper:false,hl:'#4ade80',anim:false},
-  bulle:{nm:'Bulle',font:'Montserrat',mode:'box',words:4,size:6.5,upper:false,hl:'#ffd84a',anim:true},
-  elegant:{nm:'Élégant',font:'Pacifico',mode:'soft',words:5,size:6.5,upper:false,hl:'#ffc2d6',anim:true},
-  cinema:{nm:'Cinéma',font:'Bebas Neue',mode:'cine',words:0,size:7,upper:true,hl:'#ffffff',anim:false},
-  mot:{nm:'Mot à mot',font:'Montserrat',mode:'pop',words:1,size:12,upper:true,hl:'#ff5a5a',anim:true},
-  pixel:{nm:'Jeu vidéo',font:'Press Start 2P',mode:'pop',words:2,size:5.5,upper:true,hl:'#4ade80',anim:true,stroke:.22},
-  futur:{nm:'Futur',font:'Orbitron',mode:'glow',words:3,size:6.5,upper:true,hl:'#22d3ee',anim:true},
-  disco:{nm:'Disco',font:'Monoton',mode:'glow',words:2,size:8,upper:true,hl:'#facc15',anim:true},
-  horreur:{nm:'Horreur',font:'Creepster',mode:'wobble',words:3,size:10,upper:true,hl:'#ef4444',anim:true,stroke:.14},
-  graffiti:{nm:'Graffiti',font:'Sedgwick Ave Display',mode:'shadow3d',words:3,size:10,upper:false,hl:'#f472b6',anim:true},
-  course:{nm:'Course',font:'Racing Sans One',mode:'bounce',words:3,size:9,upper:true,hl:'#f97316',anim:true},
-  bonbon:{nm:'Bonbon',font:'Chewy',mode:'bounce',words:4,size:9,upper:false,hl:'#f472b6',anim:true},
-  seventies:{nm:'Années 70',font:'Shrikhand',mode:'shadow3d',words:3,size:8,upper:false,hl:'#fb923c',anim:true},
-  militaire:{nm:'Commando',font:'Black Ops One',mode:'pop',words:3,size:8.5,upper:true,hl:'#a3e635',anim:true},
+  impact:{nm:'Impact'},
+  comic:{nm:'BD',font:'Bangers',mode:'wobble',size:10,stroke:.2},
+  gaming:{nm:'Gaming',font:'Luckiest Guy',mode:'bounce',size:8.5,hl:'#3ef0ff'},
+  neon:{nm:'Néon',font:'Righteous',mode:'glow',words:4,size:7.5,upper:false,fill:'#ff3df2',hl:'#ffffff',hl2:'#ff3df2',stroke:0},
+  titan:{nm:'Géant',font:'Anton',words:2,size:13,hl:'#ff7a1a',stroke:.14},
+  degrade:{nm:'Dégradé',font:'Poppins',mode:'gradient',hl:'#ff4d8d',hl2:'#ffb347'},
+  street:{nm:'Street',font:'Bungee',mode:'shadow3d',size:7,hl:'#b8ff3a',stroke:0,strokeColor:'#111111'},
+  marqueur:{nm:'Surligneur',font:'Permanent Marker',mode:'underline',words:4,size:7,upper:false,stroke:.1,anim:false},
+  apparition:{nm:'Apparition',font:'Lilita One',mode:'reveal',words:6,size:7.5,upper:false,anim:false},
+  karaoke:{nm:'Karaoké',mode:'color',words:5,size:6,upper:false,hl:'#4ade80',anim:false},
+  bulle:{nm:'Bulle',mode:'box',words:4,size:6.5,upper:false,stroke:0,shadow:.85},
+  elegant:{nm:'Élégant',font:'Pacifico',mode:'color',words:5,size:6.5,upper:false,hl:'#ffc2d6',stroke:0,shadow:.75},
+  cinema:{nm:'Cinéma',font:'Bebas Neue',mode:'none',words:0,size:7,stroke:0,shadow:.9,spacing:.06,anim:false},
+  mot:{nm:'Mot à mot',words:1,size:12,hl:'#ff5a5a'},
+  pixel:{nm:'Jeu vidéo',font:'Press Start 2P',words:2,size:5.5,hl:'#4ade80',stroke:.22},
+  futur:{nm:'Futur',font:'Orbitron',mode:'glow',size:6.5,fill:'#22d3ee',hl:'#ffffff',hl2:'#22d3ee',stroke:0},
+  disco:{nm:'Disco',font:'Monoton',mode:'glow',words:2,size:8,fill:'#facc15',hl:'#ffffff',hl2:'#facc15',stroke:0},
+  horreur:{nm:'Horreur',font:'Creepster',mode:'wobble',size:10,hl:'#ef4444',stroke:.14},
+  graffiti:{nm:'Graffiti',font:'Sedgwick Ave Display',mode:'shadow3d',size:10,upper:false,hl:'#f472b6',stroke:0,strokeColor:'#111111'},
+  course:{nm:'Course',font:'Racing Sans One',mode:'bounce',size:9,hl:'#f97316'},
+  bonbon:{nm:'Bonbon',font:'Chewy',mode:'bounce',words:4,size:9,upper:false,hl:'#f472b6'},
+  seventies:{nm:'Années 70',font:'Shrikhand',mode:'shadow3d',size:8,upper:false,hl:'#fb923c',stroke:0,strokeColor:'#5b2a06'},
+  militaire:{nm:'Commando',font:'Black Ops One',size:8.5,hl:'#a3e635'},
   craie:{nm:'Craie',font:'Caveat Brush',mode:'reveal',words:6,size:9,upper:false,hl:'#fde68a',anim:false},
-  magazine:{nm:'Magazine',font:'Abril Fatface',mode:'box',words:3,size:8,upper:false,hl:'#ffffff',anim:true},
-  rond:{nm:'Tout rond',font:'Fredoka',mode:'color',words:4,size:8,upper:false,hl:'#60a5fa',anim:true},
-  bloc:{nm:'Bloc',font:'Dela Gothic One',mode:'gradient',words:2,size:9,upper:true,hl:'#a78bfa',anim:true},
-  classique:{nm:'Classique',font:'IBM Plex Sans',mode:'classic',words:0,size:5,upper:false,hl:'#ffd84a',anim:false}
+  magazine:{nm:'Magazine',font:'Abril Fatface',mode:'box',size:8,upper:false,hl:'#ffffff',stroke:0,shadow:.85},
+  rond:{nm:'Tout rond',font:'Fredoka',mode:'color',words:4,size:8,upper:false,hl:'#60a5fa'},
+  bloc:{nm:'Bloc',font:'Dela Gothic One',mode:'gradient',words:2,size:9,hl:'#a78bfa'},
+  classique:{nm:'Classique',font:'IBM Plex Sans',mode:'none',words:0,size:5,upper:false,fill:'#ffd84a',stroke:0,band:true,anim:false}
 };
-let st={preset:'impact',font:'Montserrat',words:3,size:8,upper:true,hl:'#ffd84a',anim:true,pos:'bas',ratio:'16:9',bg:'#141a2a'};
-try{Object.assign(st,JSON.parse(localStorage.getItem(SKEY)||'{}'));}catch(e){}
-if(!PRESETS[st.preset])st.preset='impact';if(!FONTS[st.font])st.font=PRESETS[st.preset].font;
+function presetStyle(k){const p=PRESETS[k]||PRESETS.impact,o={};for(const key of STYLE_KEYS)o[key]=key in p?p[key]:BASE[key];return o;}
+const MKEY='atelier-sous-titres-mes-styles';
+let mine=[];try{mine=JSON.parse(localStorage.getItem(MKEY)||'[]');if(!Array.isArray(mine))mine=[];}catch(e){mine=[];}
+function saveMine(){try{localStorage.setItem(MKEY,JSON.stringify(mine));}catch(e){}}
+let st=Object.assign({preset:'impact',pos:'bas',ratio:'16:9',bg:'#141a2a'},presetStyle('impact'));
+try{const saved=JSON.parse(localStorage.getItem(SKEY)||'{}');const base=presetStyle(PRESETS[saved.preset]?saved.preset:'impact');Object.assign(st,base,saved);}catch(e){}
+if(!FONTS[st.font])st.font='Montserrat';
 function saveStyle(){try{localStorage.setItem(SKEY,JSON.stringify(st));}catch(e){}}
-function styleOf(k){const p=PRESETS[k];return {font:p.font,mode:p.mode,upper:p.upper,hl:p.hl,stroke:p.stroke,anim:false,size:30,pos:'centre'};}
+function thumbStyle(o){return Object.assign({},o,{anim:false,size:30,pos:'centre'});}
+function thumb(o,label){const cv=document.createElement('canvas');cv.width=240;cv.height=110;
+  const pg={words:[{w:"C'est",s:0,e:.5},{w:'parti',s:.5,e:1}],s:0,active:1};renderPage(cv.getContext('2d'),240,110,pg,.75,thumbStyle(o));
+  const nm=document.createElement('div');nm.className='nm';nm.textContent=label;return [cv,nm];}
+function applyStyle(o,key){Object.assign(st,o);st.preset=key;syncCtrls();saveStyle();renderPresets();drawPreview();}
 function renderPresets(){
   const box=$('presets');box.innerHTML='';
-  for(const k in PRESETS){const p=PRESETS[k];const b=document.createElement('button');b.className='preset';b.setAttribute('aria-pressed',st.preset===k);
-    const cv=document.createElement('canvas');cv.width=240;cv.height=110;
-    const nm=document.createElement('div');nm.className='nm';nm.textContent=p.nm;
-    b.append(cv,nm);
-    const pg={words:[{w:"C'est",s:0,e:.5},{w:'parti',s:.5,e:1}],s:0,active:1};
-    renderPage(cv.getContext('2d'),240,110,pg,.75,styleOf(k));
-    b.onclick=()=>{st.preset=k;Object.assign(st,{font:p.font,words:p.words,size:p.size,upper:p.upper,hl:p.hl,anim:p.anim});syncCtrls();saveStyle();renderPresets();drawPreview();};
-    box.appendChild(b);}
+  for(const k in PRESETS){const b=document.createElement('button');b.className='preset';b.setAttribute('aria-pressed',st.preset===k);
+    b.append(...thumb(presetStyle(k),PRESETS[k].nm));b.onclick=()=>applyStyle(presetStyle(k),k);box.appendChild(b);}
+  const mb=$('mine');mb.innerHTML='';$('mine-wrap').hidden=!mine.length;
+  mine.forEach((m,i)=>{const w=document.createElement('div');w.className='mine-item';
+    const b=document.createElement('button');b.className='preset';b.style.width='100%';b.setAttribute('aria-pressed',st.preset==='mine:'+i);
+    b.append(...thumb(m.style,m.nm));b.onclick=()=>applyStyle(Object.assign({},m.style),'mine:'+i);
+    const d=document.createElement('button');d.className='del';d.textContent='✕';d.title='Supprimer « '+m.nm+' »';d.setAttribute('aria-label','Supprimer le style '+m.nm);
+    d.onclick=e=>{e.stopPropagation();mine.splice(i,1);saveMine();if(st.preset.startsWith('mine:'))st.preset='';renderPresets();toast('Style supprimé');};
+    w.append(b,d);mb.appendChild(w);});
 }
 for(const f in FONTS){if(f==='Montserrat'||f==='IBM Plex Sans')continue;const l=document.createElement('link');l.rel='stylesheet';l.href='https://fonts.googleapis.com/css2?family='+f.replace(/ /g,'+')+(FONTS[f].w!==400?':wght@'+FONTS[f].w:'')+'&display=swap';const ff=f;l.onload=()=>{document.fonts&&document.fonts.load(FONTS[ff].w+' 40px "'+ff+'"').then(fontReady).catch(()=>{});};document.head.appendChild(l);}
 function fontReady(){clearTimeout(fontReady.t);fontReady.t=setTimeout(()=>{renderPresets();drawPreview();},250);}
 {const cats={};for(const f in FONTS)(cats[FONTS[f].cat]=cats[FONTS[f].cat]||[]).push(f);$('st-font').innerHTML=Object.keys(cats).map(c=>'<optgroup label="'+c+'">'+cats[c].map(f=>'<option value="'+f+'">'+FONTS[f].nm+'</option>').join('')+'</optgroup>').join('');}
-function syncCtrls(){$('st-font').value=st.font;$('st-words').value=st.words;$('st-pos').value=st.pos;$('st-size').value=st.size;$('st-hl').value=st.hl;$('st-upper').checked=st.upper;$('st-anim').checked=st.anim;$('st-ratio').value=st.ratio;$('st-bg').value=st.bg;}
-[['st-font','font',v=>v],['st-words','words',v=>+v],['st-pos','pos',v=>v],['st-size','size',v=>+v],['st-hl','hl',v=>v],['st-ratio','ratio',v=>v],['st-bg','bg',v=>v]].forEach(([id,k,f])=>$(id).addEventListener('input',e=>{st[k]=f(e.target.value);saveStyle();if(k==='ratio')fitStage();drawPreview();}));
-$('st-upper').onchange=e=>{st.upper=e.target.checked;saveStyle();drawPreview();};
-$('st-anim').onchange=e=>{st.anim=e.target.checked;saveStyle();drawPreview();};
+// Chaque réglage : [id, clé, lecture, écriture]
+const CTRL=[
+  ['st-font','font',v=>v,v=>v],['st-mode','mode',v=>v,v=>v],['st-words','words',v=>+v,v=>v],['st-pos','pos',v=>v,v=>v],
+  ['st-size','size',v=>+v,v=>v],['st-spacing','spacing',v=>v/100,v=>Math.round(v*100)],
+  ['st-fill','fill',v=>v,v=>v],['st-hl','hl',v=>v,v=>v],['st-hl2','hl2',v=>v,v=>v],
+  ['st-stroke','stroke',v=>v/100,v=>Math.round(v*100)],['st-strokeColor','strokeColor',v=>v,v=>v],['st-shadow','shadow',v=>v/100,v=>Math.round(v*100)],
+  ['st-bandColor','bandColor',v=>v,v=>v],['st-bandAlpha','bandAlpha',v=>v/100,v=>Math.round(v*100)],
+  ['st-ratio','ratio',v=>v,v=>v],['st-bg','bg',v=>v,v=>v]];
+const CHECKS=[['st-upper','upper'],['st-anim','anim'],['st-band','band']];
+function syncCtrls(){for(const [id,k,,w] of CTRL)$(id).value=w(st[k]);for(const [id,k] of CHECKS)$(id).checked=!!st[k];}
+for(const [id,k,r] of CTRL)$(id).addEventListener('input',e=>{st[k]=r(e.target.value);saveStyle();if(k==='ratio')fitStage();drawPreview();});
+for(const [id,k] of CHECKS)$(id).addEventListener('change',e=>{st[k]=e.target.checked;saveStyle();drawPreview();});
+$('st-save').onclick=()=>{
+  const nm=($('st-name').value.trim()||('Mon style '+(mine.length+1))).slice(0,24);
+  const style={};for(const k of STYLE_KEYS)style[k]=st[k];
+  const at=mine.findIndex(m=>m.nm.toLowerCase()===nm.toLowerCase());
+  if(at>=0)mine[at]={nm,style};else mine.push({nm,style});
+  saveMine();st.preset='mine:'+(at>=0?at:mine.length-1);saveStyle();$('st-name').value='';renderPresets();
+  toast(at>=0?'« '+nm+' » mis à jour':'« '+nm+' » enregistré dans Mes styles');
+};
 
 /* ---------- temps ---------- */
 function fmt(t,sep=','){t=Math.max(0,t||0);const ms=Math.round(t*1000);const h=Math.floor(ms/3600000),m=Math.floor(ms%3600000/60000),s=Math.floor(ms%60000/1000),x=ms%1000;return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')+sep+String(x).padStart(3,'0');}
@@ -369,50 +428,55 @@ function pageAt(t){
   return null;
 }
 function fontStr(S,fs){const f=FONTS[S.font]||FONTS['Montserrat'];return f.w+' '+fs+'px "'+S.font+'","Arial Black",Arial,sans-serif';}
-function curStyle(){const p=PRESETS[st.preset]||PRESETS.impact;return {font:st.font,mode:p.mode,upper:st.upper,hl:st.hl,stroke:p.stroke,anim:st.anim,size:st.size,pos:st.pos};}
+function curStyle(){const o={};for(const k of STYLE_KEYS)o[k]=st[k];o.pos=st.pos;return o;}
 function drawCaptions(ctx,W,H,t){const pg=pageAt(t);if(pg)renderPage(ctx,W,H,pg,t,curStyle());}
 function roundBox(ctx,x,y,w,h,r){ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x,y,w,h,r);else ctx.rect(x,y,w,h);ctx.fill();}
+function contrastOn(hex){const n=parseInt(String(hex).replace('#',''),16)||0;const r=n>>16&255,g=n>>8&255,b=n&255;return (0.299*r+0.587*g+0.114*b)/255>0.6?'#111111':'#ffffff';}
+function rgba(hex,a){const n=parseInt(String(hex).replace('#',''),16)||0;return 'rgba('+(n>>16&255)+','+(n>>8&255)+','+(n&255)+','+a+')';}
 function renderPage(ctx,W,H,pg,t,S){
   const mode=S.mode,base=Math.min(W,H),fs=Math.max(8,Math.round(base*S.size/100));
+  const spacingPx=Math.round(fs*(S.spacing||0));
   ctx.save();
   ctx.font=fontStr(S,fs);ctx.textBaseline='alphabetic';
-  if('letterSpacing' in ctx)ctx.letterSpacing=mode==='cine'?Math.round(fs*0.06)+'px':'0px';
+  if('letterSpacing' in ctx)ctx.letterSpacing=spacingPx+'px';
   const words=pg.words.map(w=>S.upper?w.w.toLocaleUpperCase('fr-FR'):w.w);
-  const space=ctx.measureText(' ').width*(mode==='cine'?1.2:/pop|wobble|gradient|bounce|reveal/.test(mode)?1.45:1.1),maxW=W*0.88;
+  const grows=/pop|wobble|gradient|bounce|reveal/.test(mode);
+  const space=ctx.measureText(' ').width*(grows?1.45:1.1)+spacingPx,maxW=W*0.88;
   const lines=[[]];let lw=0;
   words.forEach((w,i)=>{const ww=ctx.measureText(w).width;if(lines[lines.length-1].length&&lw+space+ww>maxW){lines.push([]);lw=0;}const L=lines[lines.length-1];L.push({i,w,ww});lw+=(L.length>1?space:0)+ww;});
-  const lh=fs*(S.font==='Pacifico'?1.45:1.22),blockH=lines.length*lh;
+  const lh=fs*(/Pacifico|Dancing|Lobster/.test(S.font)?1.45:1.22),blockH=lines.length*lh;
   const top=S.pos==='haut'?H*0.12:S.pos==='centre'?(H-blockH)/2:H*0.88-blockH;
   let k=1;if(S.anim&&!reduce){const p=Math.min(1,(t-pg.s)/0.14);k=0.82+0.18*(1-Math.pow(1-p,3));}
   ctx.translate(W/2,top+blockH/2);ctx.scale(k,k);ctx.translate(-W/2,-(top+blockH/2));
   ctx.lineJoin='round';ctx.miterLimit=2;
-  const strokeW=fs*(S.stroke||0.16);
+  const strokeW=fs*(S.stroke||0);
+  const setShadow=()=>{if(S.shadow>0){ctx.shadowColor='rgba(0,0,0,'+S.shadow+')';ctx.shadowBlur=fs*0.3;ctx.shadowOffsetY=fs*0.06;}};
+  const noShadow=()=>{ctx.shadowColor='transparent';ctx.shadowBlur=0;ctx.shadowOffsetY=0;};
   lines.forEach((L,li)=>{
     const total=L.reduce((a,b)=>a+b.ww,0)+space*(L.length-1);let x=(W-total)/2;const y=top+li*lh+fs*0.95;
-    if(mode==='classic'){ctx.fillStyle='rgba(0,0,0,0.72)';ctx.fillRect(x-fs*0.3,y-fs*0.95,total+fs*0.6,lh);}
+    if(S.band){ctx.fillStyle=rgba(S.bandColor,S.bandAlpha);ctx.fillRect(x-fs*0.3,y-fs*0.95,total+fs*0.6,lh);}
     L.forEach(o=>{
       const on=o.i===pg.active,wd=pg.words[o.i]||{s:0,e:1};
       const prog=Math.min(1,Math.max(0,(t-wd.s)/Math.max(0.05,wd.e-wd.s)));
       const cx=x+o.ww/2,cy=y-fs*0.35;
       if(mode==='reveal'&&pg.active>=0&&o.i>pg.active){x+=o.ww+space;return;}
       ctx.save();
-      let fill='#ffffff',stroke=true;
+      let fill=S.fill,glow=false;
       switch(mode){
-        case 'pop':if(on){fill=S.hl;ctx.translate(cx,cy);ctx.scale(1.12,1.12);ctx.translate(-cx,-cy);}break;
-        case 'wobble':{const r=(o.i%2?-1:1)*0.05;ctx.translate(cx,cy);ctx.rotate(r);if(on){ctx.scale(1.18,1.18);fill=S.hl;}ctx.translate(-cx,-cy);break;}
-        case 'bounce':if(on){fill=S.hl;ctx.translate(0,-fs*0.18*Math.sin(Math.PI*Math.min(1,prog*2)));}break;
         case 'color':if(on)fill=S.hl;break;
-        case 'gradient':if(on){const g=ctx.createLinearGradient(x,y-fs,x+o.ww,y);g.addColorStop(0,S.hl);g.addColorStop(1,'#ffb347');fill=g;ctx.translate(cx,cy);ctx.scale(1.1,1.1);ctx.translate(-cx,-cy);}break;
+        case 'pop':if(on){fill=S.hl;ctx.translate(cx,cy);ctx.scale(1.12,1.12);ctx.translate(-cx,-cy);}break;
+        case 'wobble':{ctx.translate(cx,cy);ctx.rotate((o.i%2?-1:1)*0.05);if(on){ctx.scale(1.18,1.18);fill=S.hl;}ctx.translate(-cx,-cy);break;}
+        case 'bounce':if(on){fill=S.hl;ctx.translate(0,-fs*0.18*Math.sin(Math.PI*Math.min(1,prog*2)));}break;
+        case 'gradient':if(on){const g=ctx.createLinearGradient(x,y-fs,x+o.ww,y);g.addColorStop(0,S.hl);g.addColorStop(1,S.hl2);fill=g;ctx.translate(cx,cy);ctx.scale(1.1,1.1);ctx.translate(-cx,-cy);}break;
         case 'reveal':if(on){fill=S.hl;const q=reduce?1:Math.min(1,(t-wd.s)/0.12);const sc=0.6+0.4*(1-Math.pow(1-q,3));ctx.translate(cx,cy);ctx.scale(sc,sc);ctx.translate(-cx,-cy);}break;
-        case 'glow':stroke=false;fill=on?'#ffffff':S.hl;ctx.shadowColor=S.hl;ctx.shadowBlur=on?fs*0.9:fs*0.4;ctx.fillStyle=fill;ctx.fillText(o.w,x,y);break;
-        case 'shadow3d':{stroke=false;const d=Math.max(2,fs*0.07);ctx.fillStyle='#111111';for(let i=d;i>0;i-=1)ctx.fillText(o.w,x+i,y+i);fill=on?S.hl:'#ffffff';if(on){ctx.translate(-d*0.4,-d*0.4);}break;}
-        case 'underline':{if(on||pg.active>o.i){ctx.save();ctx.fillStyle=S.hl;ctx.globalAlpha=0.85;const w=o.ww*(on&&!reduce?Math.min(1,prog*1.6):1);ctx.translate(x,y-fs*0.38);ctx.rotate(-0.02);roundBox(ctx,-fs*0.06,0,w+fs*0.12,fs*0.42,fs*0.1);ctx.restore();}ctx.lineWidth=fs*0.1;ctx.strokeStyle='#000000';ctx.strokeText(o.w,x,y);stroke=false;break;}
-        case 'soft':stroke=false;if(on)fill=S.hl;ctx.shadowColor='rgba(0,0,0,.75)';ctx.shadowBlur=fs*0.3;ctx.shadowOffsetY=fs*0.06;break;
-        case 'cine':stroke=false;ctx.shadowColor='rgba(0,0,0,.9)';ctx.shadowBlur=fs*0.25;ctx.shadowOffsetY=fs*0.05;break;
-        case 'box':stroke=false;if(on){ctx.fillStyle=S.hl;const px=fs*0.18;roundBox(ctx,x-px,y-fs*0.9,o.ww+px*2,fs*1.15,fs*0.18);fill='#111111';}else{ctx.shadowColor='rgba(0,0,0,.85)';ctx.shadowBlur=fs*0.25;ctx.shadowOffsetY=fs*0.05;}break;
-        case 'classic':stroke=false;fill='#ffd84a';break;
+        case 'glow':glow=true;if(on)fill=S.hl;break;
+        case 'shadow3d':{const d=Math.max(2,fs*0.07);ctx.fillStyle=S.strokeColor;for(let i=d;i>0;i-=1)ctx.fillText(o.w,x+i,y+i);if(on){fill=S.hl;ctx.translate(-d*0.4,-d*0.4);}break;}
+        case 'underline':if(on||pg.active>o.i){ctx.save();ctx.fillStyle=S.hl;ctx.globalAlpha=0.85;const w=o.ww*(on&&!reduce?Math.min(1,prog*1.6):1);ctx.translate(x,y-fs*0.38);ctx.rotate(-0.02);roundBox(ctx,-fs*0.06,0,w+fs*0.12,fs*0.42,fs*0.1);ctx.restore();}break;
+        case 'box':if(on){ctx.save();setShadow();ctx.fillStyle=S.hl;const px=fs*0.18;roundBox(ctx,x-px,y-fs*0.9,o.ww+px*2,fs*1.15,fs*0.18);ctx.restore();fill=contrastOn(S.hl);}break;
       }
-      if(stroke){ctx.lineWidth=strokeW;ctx.strokeStyle='#000000';ctx.strokeText(o.w,x,y);}
+      const boxed=mode==='box'&&on;
+      if(glow){ctx.shadowColor=S.hl2;ctx.shadowBlur=on?fs*0.9:fs*0.4;ctx.shadowOffsetY=0;}else if(!boxed)setShadow();
+      if(strokeW>0&&!boxed){ctx.lineWidth=strokeW;ctx.strokeStyle=S.strokeColor;ctx.strokeText(o.w,x,y);if(!glow)noShadow();}
       ctx.fillStyle=fill;ctx.fillText(o.w,x,y);
       ctx.restore();
       x+=o.ww+space;
